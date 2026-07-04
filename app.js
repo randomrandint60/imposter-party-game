@@ -74,6 +74,17 @@ function settingStep(key, d) {
 }
 function toggleSetting(key) { S[key] = !S[key]; saveSettings(); }
 
+function toggleFullscreen() {
+  playSound('click');
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => {
+      notify('Error enabling fullscreen: ' + err.message);
+    });
+  } else {
+    document.exitFullscreen();
+  }
+}
+
 // ── Game State ────────────────────────────────────────────────
 const GS = {
   mode: 'classic',
