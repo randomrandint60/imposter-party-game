@@ -6,7 +6,7 @@
    ============================================================ */
 
 // ── Realtime Signaling Settings ──────────────────────────────
-const WS_URL = 'wss://imposter-party-server.onrender.com';
+const WS_URL = 'wss://imposter-party-game-ek3p.onrender.com';
 
 // ── Audio ────────────────────────────────────────────────────
 let audioCtx = null;
