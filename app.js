@@ -375,11 +375,44 @@ function handleGameStateSync(data) {
 }
 
 // ── Host Room Action ──────────────────────────────────────────
-function hostOnlineRoom() {
+function openHostModal() {
+  playSound('click');
+  const preview = document.getElementById('host-avatar-preview');
+  if (preview) {
+    preview.textContent = GS.joinerAvatar.emoji;
+    preview.style.backgroundColor = GS.joinerAvatar.color;
+  }
+  document.getElementById('host-modal').classList.add('active');
+}
+
+function openHostAvatarPicker() {
+  playSound('click');
+  GS.editingPlayerId = 'host';
+  renderAvatarPickerGrids(GS.joinerAvatar.emoji, GS.joinerAvatar.color);
+  document.getElementById('avatar-modal').classList.add('active');
+}
+
+function submitHostRoom() {
+  const nameInp = document.getElementById('host-name-input');
+  const name = (nameInp.value || '').trim();
+  
+  if (!name) { notify('Please enter your name!'); return; }
+  playSound('click');
+  
+  closeModal('host-modal');
+  
   GS.isOnline = true;
   GS.isHost = true;
-  GS.players = [];
   GS.roomCode = Math.floor(1000 + Math.random() * 9000).toString();
+  GS.myPlayerId = Date.now();
+  
+  GS.players = [{
+    id: GS.myPlayerId,
+    name: name,
+    color: GS.joinerAvatar.color,
+    emoji: GS.joinerAvatar.emoji,
+    isRemote: false
+  }];
   
   initSocket(() => {
     GS.socket.emit('host_room', { room: GS.roomCode });
@@ -551,9 +584,9 @@ function renderAvatarPickerGrids(activeEmoji, activeColor) {
 
 function selectPickerEmoji(em) {
   playSound('click');
-  if (GS.editingPlayerId === 'joiner') {
+  if (GS.editingPlayerId === 'joiner' || GS.editingPlayerId === 'host') {
     GS.joinerAvatar.emoji = em;
-    const preview = document.getElementById('join-avatar-preview');
+    const preview = document.getElementById(GS.editingPlayerId === 'joiner' ? 'join-avatar-preview' : 'host-avatar-preview');
     if (preview) preview.textContent = em;
     renderAvatarPickerGrids(em, GS.joinerAvatar.color);
   } else {
@@ -570,9 +603,9 @@ function selectPickerEmoji(em) {
 
 function selectPickerColor(col) {
   playSound('click');
-  if (GS.editingPlayerId === 'joiner') {
+  if (GS.editingPlayerId === 'joiner' || GS.editingPlayerId === 'host') {
     GS.joinerAvatar.color = col;
-    const preview = document.getElementById('join-avatar-preview');
+    const preview = document.getElementById(GS.editingPlayerId === 'joiner' ? 'join-avatar-preview' : 'host-avatar-preview');
     if (preview) preview.style.backgroundColor = col;
     renderAvatarPickerGrids(GS.joinerAvatar.emoji, col);
   } else {

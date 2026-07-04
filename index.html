@@ -70,7 +70,7 @@
       <h3 style="font-size:1.15rem; font-weight:700; margin-bottom: 6px;">🌐 Online Play</h3>
       <p class="desc-text" style="margin-bottom: 12px; font-size:0.8rem">Play with friends on multiple devices in the same room.</p>
       <div style="display:flex; gap:10px;">
-        <button class="btn btn-secondary btn-full" style="font-size:0.85rem; padding: 12px 14px;" onclick="hostOnlineRoom()">Host Room</button>
+        <button class="btn btn-secondary btn-full" style="font-size:0.85rem; padding: 12px 14px;" onclick="openHostModal()">Host Room</button>
         <button class="btn btn-secondary btn-full" style="font-size:0.85rem; padding: 12px 14px;" onclick="openJoinModal()">Join Room</button>
       </div>
       <p class="online-note" style="font-size: 0.72rem; color: var(--text-muted); text-align: center; margin-top: 8px;">Only for people in the same room to play on their devices.</p>
@@ -410,6 +410,26 @@
       </div>
       
       <button class="btn btn-primary btn-full" style="padding: 12px 14px;" onclick="submitJoinRoom()">Join Room</button>
+    </div>
+  </div>
+</div>
+
+<!-- Host Room Modal -->
+<div id="host-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width: 360px;">
+    <div class="modal-header-row">
+      <h3 class="modal-title">🏠 Host Online Room</h3>
+      <button class="icon-btn" onclick="closeModal('host-modal')">✕</button>
+    </div>
+    <div class="join-fields" style="display:flex; flex-direction:column; gap:12px;">
+      <input id="host-name-input" type="text" placeholder="Enter Your Name (Host)" maxlength="15" style="border: 1px solid var(--panel-border); border-radius: 12px; padding: 10px; width: 100%; color: var(--text); background: rgba(255,255,255,0.03);">
+      
+      <div class="join-avatar-select" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 4px;">
+        <span class="section-title" style="font-size:0.8rem; text-transform:none;">Tap bubble to customize avatar</span>
+        <div id="host-avatar-preview" class="player-avatar-dot" style="background: var(--purple); cursor: pointer; width: 38px; height: 38px; box-shadow: 0 0 10px rgba(255,255,255,0.15);" onclick="openHostAvatarPicker()">🐱</div>
+      </div>
+      
+      <button class="btn btn-primary btn-full" style="padding: 12px 14px;" onclick="submitHostRoom()">Create Room</button>
     </div>
   </div>
 </div>
