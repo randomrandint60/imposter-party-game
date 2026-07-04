@@ -139,7 +139,6 @@ const gameState = {
   mode: 'classic', // 'classic' or 'liar'
   players: [],
   impostersCount: 1,
-  undercoversCount: 0,
   selectedCategory: null,
   
   // Active game run details
@@ -156,7 +155,7 @@ const gameState = {
   eliminatedPlayer: null, // Player being voted out
 
   // Custom data from localStorage
-  customPairs: [],
+  customWords: [],
   customQuestions: []
 };
 
@@ -178,7 +177,7 @@ function initApp() {
   
   // Load custom words/questions
   const savedCustomWords = localStorage.getItem('imposter_custom_words');
-  if (savedCustomWords) gameState.customPairs = JSON.parse(savedCustomWords);
+  if (savedCustomWords) gameState.customWords = JSON.parse(savedCustomWords);
   
   const savedCustomQuestions = localStorage.getItem('imposter_custom_questions');
   if (savedCustomQuestions) gameState.customQuestions = JSON.parse(savedCustomQuestions);
@@ -289,43 +288,26 @@ function removePlayer(id) {
 
 function adjustCounter(type, change) {
   playSound('click');
-  const total = gameState.players.length;
-  
   if (type === 'imposter') {
     gameState.impostersCount = Math.max(1, Math.min(3, gameState.impostersCount + change));
-  } else if (type === 'undercover') {
-    gameState.undercoversCount = Math.max(0, Math.min(2, gameState.undercoversCount + change));
   }
-  
   validateConfigCounters();
 }
 
 function validateConfigCounters() {
   const total = gameState.players.length;
-  
-  // In Classic: Civilians must be at least 1, and always outnumber Imposters + Undercovers
-  while (gameState.impostersCount + gameState.undercoversCount >= total - 1) {
-    if (gameState.undercoversCount > 0) {
-      gameState.undercoversCount--;
-    } else if (gameState.impostersCount > 1) {
-      gameState.impostersCount--;
-    } else {
-      break;
-    }
+
+  // Imposters must never leave 0 non-imposters
+  while (gameState.impostersCount >= total) {
+    gameState.impostersCount = Math.max(1, gameState.impostersCount - 1);
   }
 
-  // Update UI values
   document.getElementById('imposter-count-val').textContent = gameState.impostersCount;
-  document.getElementById('undercover-count-val').textContent = gameState.undercoversCount;
-  
-  // Show/Hide undercover row depending on mode
-  const ucRow = document.getElementById('undercover-config-card');
+
   if (gameState.mode === 'liar') {
-    ucRow.style.display = 'none';
     document.getElementById('imposter-label-main').textContent = 'Liar Count';
     document.getElementById('imposter-label-sub').textContent = 'Players with a different question';
   } else {
-    ucRow.style.display = 'flex';
     document.getElementById('imposter-label-main').textContent = 'Imposter Count';
     document.getElementById('imposter-label-sub').textContent = 'Players with no word';
   }
@@ -335,28 +317,19 @@ function validateConfigCounters() {
 function renderCategoriesGrid() {
   const grid = document.getElementById('categories-grid');
   grid.innerHTML = '';
-  
+
   const activeDb = gameState.mode === 'classic' ? IMPOSTER_WORDS : IMPOSTER_QUESTIONS;
-  
-  // Standard categories
+
   for (let key in activeDb) {
     const cat = activeDb[key];
     const card = document.createElement('div');
     card.className = 'category-card';
     card.id = `cat-${key}`;
     card.onclick = () => selectCategory(key);
-    
-    let count = 0;
-    if (gameState.mode === 'classic') {
-      count = cat.pairs.length;
-    } else {
-      count = cat.pairs.length;
-    }
-
     card.innerHTML = `
       <span class="category-emoji">${cat.icon}</span>
       <span class="category-title">${cat.name}</span>
-      <span class="category-count">${count} cards</span>
+      <span class="category-count">${cat.pairs.length} words</span>
     `;
     grid.appendChild(card);
   }
@@ -366,14 +339,7 @@ function renderCategoriesGrid() {
   customCard.className = 'category-card';
   customCard.id = 'cat-custom';
   customCard.onclick = () => selectCategory('custom');
-  
-  let customCount = 0;
-  if (gameState.mode === 'classic') {
-    customCount = gameState.customPairs.length;
-  } else {
-    customCount = gameState.customQuestions.length;
-  }
-
+  const customCount = gameState.mode === 'classic' ? gameState.customWords.length : gameState.customQuestions.length;
   customCard.innerHTML = `
     <span class="category-emoji">✨</span>
     <span class="category-title">Custom Pack</span>
@@ -412,29 +378,25 @@ function startCategoryPhase() {
 
 // Add Custom Words or Questions
 function renderCustomPacksInfo() {
-  document.getElementById('custom-words-list-count').textContent = `${gameState.customPairs.length} custom pairs loaded.`;
+  document.getElementById('custom-words-list-count').textContent = `${gameState.customWords.length} custom words loaded.`;
   document.getElementById('custom-questions-list-count').textContent = `${gameState.customQuestions.length} custom questions loaded.`;
 }
 
 function addCustomWordPair() {
-  const civInput = document.getElementById('custom-civ-word');
-  const ucInput = document.getElementById('custom-uc-word');
-  const civ = civInput.value.trim();
-  const uc = ucInput.value.trim();
-  
-  if (!civ || !uc) {
-    notify("Please fill in both words!");
+  const wordInput = document.getElementById('custom-civ-word');
+  const word = wordInput.value.trim();
+  if (!word) {
+    notify("Please enter a word!");
     return;
   }
   playSound('click');
-  gameState.customPairs.push({ civilian: civ, undercover: uc });
-  localStorage.setItem('imposter_custom_words', JSON.stringify(gameState.customPairs));
-  civInput.value = '';
-  ucInput.value = '';
+  gameState.customWords.push(word);
+  localStorage.setItem('imposter_custom_words', JSON.stringify(gameState.customWords));
+  wordInput.value = '';
   renderCustomPacksInfo();
   renderCategoriesGrid();
   selectCategory('custom');
-  notify("Custom word pair added!");
+  notify(`"${word}" added to custom pack!`);
 }
 
 function addCustomQuestionPair() {
@@ -461,7 +423,7 @@ function addCustomQuestionPair() {
 function clearCustomPacks() {
   playSound('gong');
   if (gameState.mode === 'classic') {
-    gameState.customPairs = [];
+    gameState.customWords = [];
     localStorage.removeItem('imposter_custom_words');
   } else {
     gameState.customQuestions = [];
@@ -485,20 +447,21 @@ function setupGameRound() {
   if (gameState.mode === 'classic') {
     let sourcePool = [];
     if (category === 'custom') {
-      sourcePool = gameState.customPairs;
+      sourcePool = gameState.customWords;
     } else {
-      sourcePool = IMPOSTER_WORDS[category].pairs;
+      // Each pair has a .civilian word — just use that
+      sourcePool = IMPOSTER_WORDS[category].pairs.map(p => p.civilian);
     }
-    
+
     if (sourcePool.length === 0) {
       notify("This category has no words! Please add some custom ones.");
       return;
     }
-    
+
     const randIndex = Math.floor(Math.random() * sourcePool.length);
-    wordPairSelected = sourcePool[randIndex];
-    gameState.civilianWord = wordPairSelected.civilian;
-    gameState.undercoverWord = wordPairSelected.undercover;
+    gameState.civilianWord = typeof sourcePool[randIndex] === 'string'
+      ? sourcePool[randIndex]
+      : sourcePool[randIndex].civilian;
   } else {
     // Liar Mode
     let sourcePool = [];
@@ -521,38 +484,21 @@ function setupGameRound() {
 
   playSound('click');
 
-  // Allocate roles
-  // Initialize players state
+  // Allocate roles — everyone starts as civilian with the word
   gameState.players.forEach(p => {
     p.active = true;
     p.role = 'civilian';
     p.word = gameState.mode === 'classic' ? gameState.civilianWord : gameState.normalQuestion;
   });
 
-  // Randomize indices to assign roles
+  // Shuffle player indices and assign imposters/liars
   const shuffledIndices = Array.from({ length: gameState.players.length }, (_, i) => i);
   shuffleArray(shuffledIndices);
 
-  if (gameState.mode === 'classic') {
-    // Assign Imposters
-    for (let i = 0; i < gameState.impostersCount; i++) {
-      const idx = shuffledIndices.pop();
-      gameState.players[idx].role = 'imposter';
-      gameState.players[idx].word = 'IMPOSTER';
-    }
-    // Assign Undercovers
-    for (let i = 0; i < gameState.undercoversCount; i++) {
-      const idx = shuffledIndices.pop();
-      gameState.players[idx].role = 'undercover';
-      gameState.players[idx].word = gameState.undercoverWord;
-    }
-  } else {
-    // Liar Mode: Assign Liar (role = 'imposter' for simplified check, gets liarQuestion)
-    for (let i = 0; i < gameState.impostersCount; i++) { // Liar Count uses impostersCount variable
-      const idx = shuffledIndices.pop();
-      gameState.players[idx].role = 'imposter';
-      gameState.players[idx].word = gameState.liarQuestion;
-    }
+  for (let i = 0; i < gameState.impostersCount; i++) {
+    const idx = shuffledIndices.pop();
+    gameState.players[idx].role = 'imposter';
+    gameState.players[idx].word = gameState.mode === 'classic' ? 'IMPOSTER' : gameState.liarQuestion;
   }
 
   // Start Reveal Sequence
@@ -589,16 +535,12 @@ function openRevealCard() {
   if (gameState.mode === 'classic') {
     if (activePlayer.role === 'civilian') {
       cardFront.classList.add('role-civilian');
-      label.textContent = 'You are a Civilian';
-      secretDisplay.innerHTML = `<span style="font-size: 1.1rem; color: #a39eb9; font-weight: 500;">Your secret word is:</span><br>${activePlayer.word}`;
-    } else if (activePlayer.role === 'undercover') {
-      cardFront.classList.add('role-undercover');
-      label.textContent = 'You are Undercover';
-      secretDisplay.innerHTML = `<span style="font-size: 1.1rem; color: #a39eb9; font-weight: 500;">Your secret word is:</span><br>${activePlayer.word}`;
+      label.textContent = '✅ You know the word';
+      secretDisplay.innerHTML = `<span style="font-size: 1rem; color: #a39eb9; font-weight: 500;">Secret word:</span><br>${activePlayer.word}`;
     } else {
       cardFront.classList.add('role-imposter');
-      label.textContent = 'You are the Imposter';
-      secretDisplay.textContent = activePlayer.word; // "IMPOSTER"
+      label.textContent = '🔴 You are the Imposter';
+      secretDisplay.innerHTML = `<span style="font-size: 1rem; color: #ff007f; font-weight: 600;">You have NO word.<br>Blend in and bluff!</span>`;
     }
   } else {
     // Find the Liar Mode
@@ -811,9 +753,7 @@ function executeElimination() {
   // Reveal their role in notification
   let roleText = '';
   if (gameState.mode === 'classic') {
-    if (p.role === 'civilian') roleText = 'Civilian (Word: ' + p.word + ')';
-    else if (p.role === 'undercover') roleText = 'Undercover (Word: ' + p.word + ')';
-    else roleText = 'Imposter!';
+    roleText = p.role === 'imposter' ? 'the Imposter!' : `a Civilian (word: ${gameState.civilianWord})`;
   } else {
     roleText = p.role === 'imposter' ? 'the Liar!' : 'a Normal Citizen';
   }
@@ -827,51 +767,32 @@ function executeElimination() {
 function checkGameEndConditions() {
   const activePlayers = gameState.players.filter(p => p.active);
   const activeImposters = activePlayers.filter(p => p.role === 'imposter');
-  const activeUndercovers = activePlayers.filter(p => p.role === 'undercover');
   const activeCivilians = activePlayers.filter(p => p.role === 'civilian');
-  
+
   if (gameState.mode === 'classic') {
-    // If all Imposters and Undercovers are dead
-    if (activeImposters.length === 0 && activeUndercovers.length === 0) {
-      // Civilians win, BUT if there is a voted-out Imposter, they get a chance to steal victory!
-      // In party games, if an Imposter gets caught, they can guess the secret Civilian word.
-      // Let's prompt the Imposter Guess screen!
-      const votedOutImposters = gameState.players.filter(p => !p.active && p.role === 'imposter');
-      if (votedOutImposters.length > 0) {
-        startImposterGuessPhase();
-      } else {
-        triggerGameOver('civilians');
-      }
+    if (activeImposters.length === 0) {
+      // All imposters caught — they get a last-chance guess!
+      startImposterGuessPhase();
       return;
     }
-    
-    // If Imposters/Undercovers equal or outnumber Civilians
-    if (activeImposters.length + activeUndercovers.length >= activeCivilians.length) {
-      if (activeUndercovers.length > 0 && activeImposters.length === 0) {
-        triggerGameOver('undercovers');
-      } else {
-        triggerGameOver('imposters');
-      }
+    if (activeImposters.length >= activeCivilians.length) {
+      triggerGameOver('imposters');
       return;
     }
   } else {
-    // Find the Liar Mode
-    if (activeImposters.length === 0) { // Liar is 'imposter' role
+    if (activeImposters.length === 0) {
       triggerGameOver('civilians');
       return;
     }
-    
     if (activeImposters.length >= activeCivilians.length) {
-      triggerGameOver('imposters'); // Liar wins
+      triggerGameOver('imposters');
       return;
     }
   }
-  
-  // If game is not over, go to the next describe round with remaining active players
+
+  // Game continues
   renderVotingGrid();
-  setTimeout(() => {
-    startDescriptionPhase();
-  }, 2000);
+  setTimeout(() => { startDescriptionPhase(); }, 1500);
 }
 
 // Imposter Word guessing phase
@@ -907,29 +828,24 @@ function submitImposterGuess() {
 function triggerGameOver(winner) {
   const banner = document.getElementById('gameover-winner-banner');
   banner.className = 'winner-banner';
-  
+
   if (winner === 'civilians') {
     playSound('win');
-    banner.textContent = gameState.mode === 'classic' ? 'Civilians Win!' : 'Citizens Win!';
+    banner.textContent = gameState.mode === 'classic' ? '🎉 Civilians Win!' : '🎉 Citizens Win!';
     banner.classList.add('civilians-win');
-  } else if (winner === 'undercovers') {
-    playSound('win');
-    banner.textContent = 'Undercovers Win!';
-    banner.classList.add('undercovers-win');
   } else {
     playSound('fail');
-    banner.textContent = gameState.mode === 'classic' ? 'Imposters Win!' : 'The Liar Wins!';
+    banner.textContent = gameState.mode === 'classic' ? '😈 Imposter Wins!' : '🤥 The Liar Wins!';
     banner.classList.add('imposters-win');
   }
 
-  // Display revealed words
+  // Display revealed word/question
   const infoBox = document.getElementById('gameover-word-reveal');
   if (gameState.mode === 'classic') {
     infoBox.innerHTML = `
-      <div class="word-reveal-label">Secret Words Revealed</div>
-      <div class="word-reveal-values">
-        Civilians: <span style="color: var(--color-civilian);">${gameState.civilianWord}</span>
-        ${gameState.undercoversCount > 0 ? `<br>Undercovers: <span style="color: var(--color-undercover);">${gameState.undercoverWord}</span>` : ''}
+      <div class="word-reveal-label">The Secret Word Was</div>
+      <div class="word-reveal-values" style="font-size:1.4rem">
+        <span style="color: var(--cyan);">${gameState.civilianWord}</span>
       </div>
     `;
   } else {
@@ -949,13 +865,10 @@ function triggerGameOver(winner) {
   gameState.players.forEach(p => {
     const el = document.createElement('div');
     el.className = 'summary-item';
-    
-    let roleText = 'Civilian';
+
+    let roleText = gameState.mode === 'classic' ? 'Civilian' : 'Citizen';
     let roleClass = 'tag-civilian';
-    if (p.role === 'undercover') {
-      roleText = 'Undercover';
-      roleClass = 'tag-undercover';
-    } else if (p.role === 'imposter') {
+    if (p.role === 'imposter') {
       roleText = gameState.mode === 'classic' ? 'Imposter' : 'Liar';
       roleClass = 'tag-imposter';
     }
@@ -1000,19 +913,6 @@ function setGameMode(mode) {
   playSound('click');
   gameState.mode = mode;
   validateConfigCounters();
-  
-  // Highlight active mode buttons
-  const classicBtn = document.getElementById('mode-btn-classic');
-  const liarBtn = document.getElementById('mode-btn-liar');
-  
-  if (mode === 'classic') {
-    classicBtn.style.borderColor = 'var(--neon-purple)';
-    liarBtn.style.borderColor = 'var(--panel-border)';
-  } else {
-    classicBtn.style.borderColor = 'var(--panel-border)';
-    liarBtn.style.borderColor = 'var(--neon-purple)';
-  }
-  
   startCategoryPhase();
 }
 

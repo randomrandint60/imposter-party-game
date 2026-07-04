@@ -74,10 +74,10 @@
 
       <!-- Mode Selection Cards -->
       <div class="mode-card" onclick="setGameMode('classic')">
-        <div class="mode-icon">🍕</div>
+        <div class="mode-icon">🕵️</div>
         <div class="mode-info">
           <h3>Classic Mode</h3>
-          <p>Everyone gets a word, but one player receives "IMPOSTER". Bluff and find the liar!</p>
+          <p>Everyone gets the secret word — except the Imposter. Find the faker before they blend in!</p>
         </div>
       </div>
 
@@ -85,7 +85,7 @@
         <div class="mode-icon">💬</div>
         <div class="mode-info">
           <h3>Find the Liar</h3>
-          <p>Everyone answers the same question, except one player who gets a different one. Spot the odd one out!</p>
+          <p>Everyone answers the same question — except one player who gets a different one. Spot the odd one out!</p>
         </div>
       </div>
 
@@ -118,30 +118,15 @@
 
       <div class="glass-panel">
         <h2>Role Settings</h2>
-        
-        <!-- Imposter Count Configuration -->
-        <div class="config-card" style="margin-bottom: 10px;">
+        <div class="config-card">
           <div class="config-label-container">
-            <span id="imposter-label-main" class="config-label">Imposters</span>
+            <span id="imposter-label-main" class="config-label">Imposter Count</span>
             <span id="imposter-label-sub" class="config-sublabel">Players with no word</span>
           </div>
           <div class="config-counter">
             <button class="counter-btn" onclick="adjustCounter('imposter', -1)">-</button>
             <span id="imposter-count-val" class="counter-val">1</span>
             <button class="counter-btn" onclick="adjustCounter('imposter', 1)">+</button>
-          </div>
-        </div>
-
-        <!-- Undercover Count Configuration (Classic Mode Only) -->
-        <div id="undercover-config-card" class="config-card">
-          <div class="config-label-container">
-            <span class="config-label">Undercovers</span>
-            <span class="config-sublabel">Players with a similar word</span>
-          </div>
-          <div class="config-counter">
-            <button class="counter-btn" onclick="adjustCounter('undercover', -1)">-</button>
-            <span id="undercover-count-val" class="counter-val">0</span>
-            <button class="counter-btn" onclick="adjustCounter('undercover', 1)">+</button>
           </div>
         </div>
       </div>
@@ -171,10 +156,9 @@
         <!-- Classic mode custom inputs -->
         <div id="custom-word-entry" class="custom-inputs">
           <div class="custom-input-group">
-            <input type="text" id="custom-civ-word" placeholder="Civilian word (e.g. Coffee)">
-            <input type="text" id="custom-uc-word" placeholder="Undercover word (e.g. Tea)">
+            <input type="text" id="custom-civ-word" placeholder="Enter a secret word (e.g. Pizza)">
           </div>
-          <button class="btn btn-secondary" style="padding: 10px; font-size: 0.85rem; margin-top: 6px;" onclick="addCustomWordPair()">➕ Add Word Pair</button>
+          <button class="btn btn-secondary" style="padding: 10px; font-size: 0.85rem; margin-top: 6px;" onclick="addCustomWordPair()">➕ Add Word</button>
         </div>
 
         <!-- Liar mode custom inputs -->
@@ -357,14 +341,13 @@
 
         <h4>🍕 Classic Mode</h4>
         <ul>
-          <li><strong>Civilians</strong> receive the secret word (e.g., "Pizza").</li>
-          <li><strong>Undercovers</strong> receive a slightly different but similar word (e.g., "Burger").</li>
-          <li><strong>Imposters</strong> receive "IMPOSTER" (no word, no clues!).</li>
+          <li><strong>Everyone</strong> receives the same secret word (e.g., "Pizza").</li>
+          <li>The <strong>Imposter</strong> receives nothing — they must bluff their way through!</li>
         </ul>
 
         <h4>💬 Find the Liar Mode</h4>
         <ul>
-          <li>Everyone receives the same question, except one player (the <strong>Liar</strong>) who receives a different but similar question.</li>
+          <li>Everyone receives the same question, except one player (the <strong>Liar</strong>) who gets a different but similar question.</li>
           <li>For example: "Favorite summer food?" vs. "Favorite winter food?".</li>
         </ul>
 
