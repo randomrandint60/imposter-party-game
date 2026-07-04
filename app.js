@@ -37,6 +37,11 @@ function playSound(n) { SOUNDS[n] && SOUNDS[n](); }
 const COLORS = ['#8b5cf6','#00f0ff','#ff007f','#10b981','#f59e0b',
                 '#3b82f6','#ef4444','#a855f7','#06b6d4','#84cc16','#f97316','#ec4899'];
 const EMOJIS = ['🐱','🐶','🦊','🐺','🐻','🐼','🐨','🐯','🦁','🐸','🐧','🦉'];
+const PICKER_EMOJIS = [
+  '🐱','🐶','🦊','🐺','🐻','🐼','🐨','🐯','🦁','🐸','🐧','🦉',
+  '🐙','🐵','🐔','🦄','🦖','🐝','👻','👽','🤖','🍕','🍩','💩',
+  '🔥','⭐','🎮','🎸','🚀','👑','🍿','🎨','🍔','🥑','🍉','🌮'
+];
 
 // ── Settings ──────────────────────────────────────────────────
 const DEF_SETTINGS = { imposterCount:1, imposterGoesLast:false, imposterHint:false, timerDuration:30 };
@@ -85,7 +90,10 @@ const GS = {
 
   // custom packs
   customWords: [],
-  customQuestions: []
+  customQuestions: [],
+  
+  // avatar picker edit state
+  editingPlayerId: null
 };
 
 // ── Init ──────────────────────────────────────────────────────
@@ -146,7 +154,8 @@ function renderPlayerList() {
     li.className = 'player-tag';
     li.innerHTML = `
       <div class="player-info-tag">
-        <div class="player-avatar-dot" style="background:${p.color}">${p.emoji}</div>
+        <div class="player-avatar-dot" style="background:${p.color}; cursor: pointer;" 
+             onclick="openAvatarPicker(${p.id})" title="Edit Icon">${p.emoji}</div>
         <input type="text" class="player-name-input" value="${esc(p.name)}" 
                onchange="renamePlayer(${p.id}, this.value)" 
                onkeydown="if(event.key==='Enter') this.blur()">
@@ -155,6 +164,59 @@ function renderPlayerList() {
     ul.appendChild(li);
   });
   updatePlayerCount();
+}
+
+function openAvatarPicker(id) {
+  playSound('click');
+  GS.editingPlayerId = id;
+  const p = GS.players.find(x => x.id === id);
+  if (!p) return;
+  renderAvatarPickerGrids(p.emoji, p.color);
+  document.getElementById('avatar-modal').classList.add('active');
+}
+
+function renderAvatarPickerGrids(activeEmoji, activeColor) {
+  const emGrid = document.getElementById('picker-emojis-grid');
+  emGrid.innerHTML = '';
+  PICKER_EMOJIS.forEach(em => {
+    const btn = document.createElement('button');
+    btn.className = 'picker-em-btn' + (em === activeEmoji ? ' active' : '');
+    btn.textContent = em;
+    btn.onclick = () => selectPickerEmoji(em);
+    emGrid.appendChild(btn);
+  });
+
+  const colGrid = document.getElementById('picker-colors-grid');
+  colGrid.innerHTML = '';
+  COLORS.forEach(col => {
+    const btn = document.createElement('button');
+    btn.className = 'picker-col-btn' + (col === activeColor ? ' active' : '');
+    btn.style.backgroundColor = col;
+    btn.onclick = () => selectPickerColor(col);
+    colGrid.appendChild(btn);
+  });
+}
+
+function selectPickerEmoji(em) {
+  playSound('click');
+  const p = GS.players.find(x => x.id === GS.editingPlayerId);
+  if (p) {
+    p.emoji = em;
+    savePlayers();
+    renderPlayerList();
+    renderAvatarPickerGrids(p.emoji, p.color);
+  }
+}
+
+function selectPickerColor(col) {
+  playSound('click');
+  const p = GS.players.find(x => x.id === GS.editingPlayerId);
+  if (p) {
+    p.color = col;
+    savePlayers();
+    renderPlayerList();
+    renderAvatarPickerGrids(p.emoji, p.color);
+  }
 }
 
 function updatePlayerCount() {

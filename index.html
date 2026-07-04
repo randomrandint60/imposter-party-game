@@ -318,6 +318,26 @@
   </div>
 </div>
 
+<!-- Avatar & Color picker -->
+<div id="avatar-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width: 380px;">
+    <div class="modal-header-row">
+      <h3 class="modal-title">🎨 Edit Icon &amp; Color</h3>
+      <button class="icon-btn" onclick="closeModal('avatar-modal')">✕</button>
+    </div>
+    
+    <div class="picker-section">
+      <span class="section-title" style="font-size:0.8rem; margin-bottom: 10px; display:block;">Choose Emoji</span>
+      <div id="picker-emojis-grid" class="picker-em-grid"></div>
+    </div>
+    
+    <div class="picker-section" style="margin-top: 20px;">
+      <span class="section-title" style="font-size:0.8rem; margin-bottom: 10px; display:block;">Choose Color</span>
+      <div id="picker-colors-grid" class="picker-col-grid"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Rules -->
 <div id="rules-modal" class="modal-overlay">
   <div class="modal-box">
