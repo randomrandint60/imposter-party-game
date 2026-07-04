@@ -3,387 +3,353 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Imposter Game – Party Edition</title>
-  <meta name="description" content="A premium social deduction party word game. Discover the imposter in your group or bluff your way to victory. Free to play in your browser.">
-  <meta name="theme-color" content="#07050f">
+  <meta name="description" content="Imposter Party Game — Who is the imposter? A fun social deduction party game.">
+  <title>Imposter Party 🕵️</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <style>
-    /* Web-specific overrides: remove Electron titlebar space */
-    .app-header-electron { display: none !important; }
-
-    /* On desktop, center the app card */
-    body {
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      padding: 20px 0 40px;
-    }
-
-    .app-container {
-      width: 100%;
-      max-width: 480px;
-      min-height: 100vh;
-      border-radius: 0;
-    }
-
-    @media (min-width: 520px) {
-      body {
-        align-items: center;
-        padding: 40px 20px;
-      }
-      .app-container {
-        min-height: unset;
-        border-radius: 28px;
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 20px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
-      }
-    }
-  </style>
 </head>
 <body>
 
-  <!-- Ambient Blurred Glow Elements -->
-  <div class="ambient-glows">
-    <div class="glow-blob glow-blob-1"></div>
-    <div class="glow-blob glow-blob-2"></div>
-    <div class="glow-blob glow-blob-3"></div>
-  </div>
+<!-- Background glows -->
+<div class="ambient" aria-hidden="true">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+</div>
 
-  <!-- App Wrapper -->
-  <div class="app-container">
+<!-- Notification -->
+<div id="notification-banner" class="notification" role="alert"></div>
 
-    <!-- Notification Banner -->
-    <div id="notification-banner" class="notification">Notification Message</div>
+<!-- ═══════════════════════════════════════════════════════════
+     APP CONTAINER  (fixed viewport — no page scroll)
+════════════════════════════════════════════════════════════ -->
+<div class="app-container">
 
-    <!-- SCREEN 1: HOME SCREEN -->
-    <div id="screen-home" class="screen active">
-      <header>
-        <div class="logo-shield">🕵️</div>
-        <h1 class="app-title">Imposter</h1>
-        <div class="app-subtitle">Party Edition</div>
-      </header>
+  <!-- ── Screen: Home ────────────────────────────────────── -->
+  <div id="screen-home" class="screen">
+    <header class="game-header">
+      <div class="logo-shield">🕵️</div>
+      <h1 class="app-title">IMPOSTER</h1>
+      <p class="app-sub">PARTY GAME</p>
+      <button class="icon-btn settings-fab" onclick="openSettings()" title="Settings">⚙️</button>
+    </header>
 
-      <div class="glass-panel">
-        <p class="desc" style="text-align: center; margin-bottom: 0;">
-          A game of bluffing, secrets, and deception. Grab your friends, pass the device, and find the liar!
-        </p>
-      </div>
-
-      <h2 style="font-size: 1.1rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; padding-left: 6px;">Select Game Mode</h2>
-
-      <!-- Mode Selection Cards -->
-      <div class="mode-card" onclick="setGameMode('classic')">
+    <div class="mode-cards">
+      <div class="mode-card" onclick="setGameMode('classic')" id="mode-classic">
         <div class="mode-icon">🕵️</div>
         <div class="mode-info">
           <h3>Classic Mode</h3>
-          <p>Everyone gets the secret word — except the Imposter. Find the faker before they blend in!</p>
+          <p>Everyone knows the secret word — except the Imposter. Find the faker!</p>
         </div>
+        <span class="mode-arrow">›</span>
       </div>
-
-      <div class="mode-card" onclick="setGameMode('liar')">
+      <div class="mode-card" onclick="setGameMode('liar')" id="mode-liar">
         <div class="mode-icon">💬</div>
         <div class="mode-info">
           <h3>Find the Liar</h3>
-          <p>Everyone answers the same question — except one player who gets a different one. Spot the odd one out!</p>
+          <p>Everyone answers the same question — except the Liar who gets a different one!</p>
         </div>
-      </div>
-
-      <div class="btn-container">
-        <button class="btn btn-secondary" onclick="toggleRulesModal()">📖 How to Play</button>
+        <span class="mode-arrow">›</span>
       </div>
     </div>
 
-    <!-- SCREEN 2: SETUP SCREEN -->
-    <div id="screen-setup" class="screen">
-      <header>
-        <h1 class="app-title" style="font-size: 1.8rem;">Players Setup</h1>
-      </header>
-
-      <div class="glass-panel">
-        <h2>Add Players</h2>
-        <p class="desc">Enter the names of the players in your circle (3 to 12 players).</p>
-        
-        <div class="setup-row">
-          <div class="add-player-box">
-            <input type="text" id="new-player-name" placeholder="Enter player name..." onkeydown="if(event.key === 'Enter') addPlayer()">
-            <button class="add-btn" onclick="addPlayer()">+</button>
-          </div>
-          
-          <div id="players-list" class="players-list-container">
-            <!-- Populated via JavaScript -->
-          </div>
-        </div>
-      </div>
-
-      <div class="glass-panel">
-        <h2>Role Settings</h2>
-        <div class="config-card">
-          <div class="config-label-container">
-            <span id="imposter-label-main" class="config-label">Imposter Count</span>
-            <span id="imposter-label-sub" class="config-sublabel">Players with no word</span>
-          </div>
-          <div class="config-counter">
-            <button class="counter-btn" onclick="adjustCounter('imposter', -1)">-</button>
-            <span id="imposter-count-val" class="counter-val">1</span>
-            <button class="counter-btn" onclick="adjustCounter('imposter', 1)">+</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="btn-container">
-        <button class="btn btn-primary" onclick="startCategoryPhase()">Choose Word Pack ➜</button>
-        <button class="btn btn-secondary" onclick="playSound('click'); showScreen('screen-home')">⬅ Back</button>
-      </div>
-    </div>
-
-    <!-- SCREEN 3: CATEGORY SELECTION -->
-    <div id="screen-categories" class="screen">
-      <header>
-        <h1 class="app-title" style="font-size: 1.8rem;">Select Pack</h1>
-      </header>
-
-      <div id="categories-grid" class="category-grid">
-        <!-- Rendered dynamically -->
-      </div>
-
-      <!-- Custom Pack Inputs -->
-      <div class="glass-panel custom-pack-panel">
-        <h2>Custom Category Builder</h2>
-        <p id="custom-words-list-count" class="desc" style="margin-bottom: 10px;">0 custom pairs loaded.</p>
-        <p id="custom-questions-list-count" class="desc" style="margin-bottom: 10px; display:none;">0 custom questions loaded.</p>
-        
-        <!-- Classic mode custom inputs -->
-        <div id="custom-word-entry" class="custom-inputs">
-          <div class="custom-input-group">
-            <input type="text" id="custom-civ-word" placeholder="Enter a secret word (e.g. Pizza)">
-          </div>
-          <button class="btn btn-secondary" style="padding: 10px; font-size: 0.85rem; margin-top: 6px;" onclick="addCustomWordPair()">➕ Add Word</button>
-        </div>
-
-        <!-- Liar mode custom inputs -->
-        <div id="custom-question-entry" class="custom-inputs" style="display:none;">
-          <div class="custom-input-group" style="flex-direction: column;">
-            <input type="text" id="custom-normal-q" placeholder="Normal question (e.g. Favorite hot drink?)" style="margin-bottom: 6px;">
-            <input type="text" id="custom-liar-q" placeholder="Liar question (e.g. Favorite cold drink?)">
-          </div>
-          <button class="btn btn-secondary" style="padding: 10px; font-size: 0.85rem; margin-top: 6px;" onclick="addCustomQuestionPair()">➕ Add Question Pair</button>
-        </div>
-
-        <button class="btn btn-secondary" style="padding: 8px; font-size: 0.85rem; margin-top: 10px; color: #ff4a4a; border-color: rgba(255, 74, 74, 0.2);" onclick="clearCustomPacks()">🗑️ Clear Custom Pack</button>
-      </div>
-
-      <div class="btn-container">
-        <button class="btn btn-primary" onclick="setupGameRound()">Start Game 🚀</button>
-        <button class="btn btn-secondary" onclick="playSound('click'); showScreen('screen-setup')">⬅ Back</button>
-      </div>
-    </div>
-
-    <!-- SCREEN 4: REVEAL INTRO (Privacy Screen) -->
-    <div id="screen-reveal-intro" class="screen">
-      <div class="pass-container">
-        <div class="pass-privacy-msg">⚠️ Hand over the device</div>
-        <div id="reveal-intro-avatar" class="pass-avatar">🐱</div>
-        <div class="pass-name">Pass to <span id="reveal-intro-name">Alice</span></div>
-        <p class="desc" style="max-width: 280px; margin: 0 auto;">Make sure no one else is looking at the screen, then tap the button to see your secret role!</p>
-        
-        <button class="btn btn-cyan" style="width: 100%; max-width: 250px; margin-top: 15px;" onclick="openRevealCard()">👁️ Tap to Reveal</button>
-      </div>
-    </div>
-
-    <!-- SCREEN 5: REVEAL CARD (3D Flipping Card) -->
-    <div id="screen-reveal-card" class="screen">
-      <h2 style="font-size: 1.1rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; text-align: center;">Tap Card to Reveal</h2>
-      
-      <!-- Flippable Card Container -->
-      <div id="reveal-card-container" class="card-container" onclick="handleCardClick()">
-        
-        <!-- BACK SIDE -->
-        <div class="card-side card-back">
-          <span class="card-badge">IMPOSTER GAME</span>
-          <div class="card-mystery-icon">🕵️‍♂️</div>
-          <div class="card-prompt">Secret Assignment</div>
-          <span class="card-tap-hint">Tap to Flip Card</span>
-        </div>
-        
-        <!-- FRONT SIDE -->
-        <div id="reveal-card-front" class="card-side card-front">
-          <div class="card-player-header">
-            <div id="reveal-card-player-avatar" class="card-player-avatar">🐱</div>
-            <span id="reveal-card-player-name">Alice</span>
-          </div>
-          
-          <div class="role-reveal-box">
-            <span id="reveal-role-label" class="role-label">Civilian</span>
-            <div id="reveal-secret-display" class="secret-word-display">Pizza</div>
-          </div>
-          
-          <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Memorized? Tap button below</span>
-        </div>
-        
-      </div>
-
-      <div style="width: 100%; max-width: 300px;">
-        <button class="btn btn-primary" style="width: 100%;" onclick="nextPlayerReveal()">I've seen it (hide) ➔</button>
-      </div>
-    </div>
-
-    <!-- SCREEN 6: DESCRIPTION PHASE (TIMER) -->
-    <div id="screen-describe" class="screen">
-      <div class="turn-header">
-        <span class="turn-subtitle">Description Phase</span>
-        <h2>Give a Clue!</h2>
-      </div>
-
-      <div id="active-desc-banner" class="active-player-banner">
-        <div id="active-desc-avatar" class="active-avatar">🐱</div>
-        <div id="active-desc-name" class="active-name">Alice</div>
-        
-        <!-- Circular Timer Component -->
-        <div class="timer-container" id="timer-box">
-          <svg class="timer-svg">
-            <circle class="timer-circle-bg" cx="55" cy="55" r="50"></circle>
-            <circle id="timer-ring" class="timer-circle-val" cx="55" cy="55" r="50"></circle>
-          </svg>
-          <div id="timer-val-text" class="timer-text">30</div>
-        </div>
-
-        <button id="timer-control-btn" class="btn btn-primary" style="padding: 10px 20px; font-size: 0.85rem;" onclick="toggleTimer()">Start Timer</button>
-      </div>
-
-      <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; color: var(--text-secondary); padding-left: 4px;">Speaking Queue</h3>
-      <div id="description-queue" class="description-queue">
-        <!-- Rendered dynamically -->
-      </div>
-
-      <div class="btn-container">
-        <button class="btn btn-cyan" onclick="nextDescriber()">Next Player ➔</button>
-      </div>
-    </div>
-
-    <!-- SCREEN 7: VOTING SCREEN -->
-    <div id="screen-vote" class="screen">
-      <header>
-        <span class="app-subtitle" style="font-size: 0.75rem;">Accuse Someone</span>
-        <h1 class="app-title" style="font-size: 1.8rem;">Time to Vote!</h1>
-      </header>
-
-      <div class="glass-panel" style="padding: 16px; margin-bottom: 16px;">
-        <p class="desc" style="text-align: center; margin-bottom: 0; font-size: 0.9rem;">
-          Discuss together and vote on who you think is the Imposter/Liar. Tap on a player to eliminate them.
-        </p>
-      </div>
-
-      <div id="voting-grid" class="voting-grid">
-        <!-- Dynamic list of players -->
-      </div>
-    </div>
-
-    <!-- SCREEN 8: IMPOSTER GUESS PHASE -->
-    <div id="screen-guess" class="screen">
-      <header>
-        <div class="logo-shield">🧠</div>
-        <h1 class="app-title" style="font-size: 1.8rem;">Imposter's Guess</h1>
-      </header>
-
-      <div class="glass-panel">
-        <h2 style="text-align: center; color: var(--neon-magenta);">Steal the Victory!</h2>
-        <p class="desc" style="text-align: center;">
-          The Civilians identified you, but you can still win! Guess the secret word given to the Civilians:
-        </p>
-        
-        <div class="guess-box">
-          <input type="text" id="guess-word-input" placeholder="Type secret word guess...">
-          <button class="btn btn-accent" style="width: 100%;" onclick="submitImposterGuess()">Submit Guess ➜</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- SCREEN 9: GAME OVER SCREEN -->
-    <div id="screen-gameover" class="screen">
-      <div class="gameover-header">
-        <span class="app-subtitle">Round Ended</span>
-        <h1 id="gameover-winner-banner" class="winner-banner civilians-win">Civilians Win!</h1>
-      </div>
-
-      <div id="gameover-word-reveal" class="word-reveal-box">
-        <!-- Dynamic reveal values -->
-      </div>
-
-      <h2 style="font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;">Round Summary</h2>
-      <div id="gameover-summary-list" class="gameover-summary">
-        <!-- Dynamic player roles list -->
-      </div>
-
-      <div class="btn-container">
-        <button class="btn btn-primary" onclick="setupGameRound()">Play Again 🔄</button>
-        <button class="btn btn-secondary" onclick="playSound('click'); showScreen('screen-home')">🏠 Main Menu</button>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- HOW TO PLAY MODAL overlay -->
-  <div id="rules-modal" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>How to Play</h3>
-        <button class="close-modal-btn" onclick="toggleRulesModal()">✕</button>
-      </div>
-      
-      <div class="rules-body">
-        <h4>🎮 Setup</h4>
-        <ul>
-          <li>Add 3 to 12 player names.</li>
-          <li>Choose how many Imposters and Undercovers you want in the settings.</li>
-          <li>Select a category word pack.</li>
-        </ul>
-
-        <h4>🍕 Classic Mode</h4>
-        <ul>
-          <li><strong>Everyone</strong> receives the same secret word (e.g., "Pizza").</li>
-          <li>The <strong>Imposter</strong> receives nothing — they must bluff their way through!</li>
-        </ul>
-
-        <h4>💬 Find the Liar Mode</h4>
-        <ul>
-          <li>Everyone receives the same question, except one player (the <strong>Liar</strong>) who gets a different but similar question.</li>
-          <li>For example: "Favorite summer food?" vs. "Favorite winter food?".</li>
-        </ul>
-
-        <h4>🗣️ Clue &amp; Discuss Phase</h4>
-        <ul>
-          <li>Each player gives a one-sentence clue (in Classic) or answer (in Liar) based on their card.</li>
-          <li><strong>Civilians</strong> must be clever: give a clue that other Civilians understand, but vague enough so the Imposter doesn't guess the word.</li>
-          <li><strong>Imposters</strong> must bluff, guess the topic, and blend in!</li>
-        </ul>
-
-        <h4>🗳️ Vote &amp; Win</h4>
-        <ul>
-          <li>Discuss who is lying and vote to eliminate a player.</li>
-          <li>Voted-out players reveal their card.</li>
-          <li>If the Imposter is eliminated, they get a final chance to guess the Civilians' word to steal the win!</li>
-        </ul>
-      </div>
+    <div class="home-footer">
+      <button class="btn btn-ghost" onclick="toggleRules()">📖 How to Play</button>
     </div>
   </div>
 
-  <!-- CONFIRM ELIMINATION MODAL -->
-  <div id="vote-confirm-modal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 320px; text-align: center;">
-      <h3 style="margin-bottom: 12px; font-size: 1.2rem;">Confirm Elimination</h3>
-      <p class="desc">Are you sure you want to eliminate <strong id="vote-modal-name" style="color: white;">Alice</strong> from the game?</p>
-      
-      <div style="display: flex; gap: 10px; margin-top: 20px;">
-        <button class="btn btn-accent" style="flex: 1; padding: 12px;" onclick="executeElimination()">Yes, Eliminate</button>
-        <button class="btn btn-secondary" style="flex: 1; padding: 12px;" onclick="closeModal('vote-confirm-modal')">Cancel</button>
+  <!-- ── Screen: Setup (Players + Category) ──────────────── -->
+  <div id="screen-setup" class="screen">
+    <div class="screen-topbar">
+      <button class="back-btn" onclick="playSound('click'); showScreen('screen-home')">‹</button>
+      <h2 class="topbar-title">Setup</h2>
+      <button class="icon-btn" onclick="openSettings()">⚙️</button>
+    </div>
+
+    <!-- Player management -->
+    <div class="glass-panel">
+      <div class="section-header">
+        <span class="section-title">Players</span>
+        <span id="player-count" class="badge">4 / 12</span>
       </div>
+
+      <div class="add-player-row">
+        <input id="new-player-name" type="text" placeholder="Enter player name…"
+               maxlength="20" autocomplete="off" spellcheck="false"
+               onkeydown="if(event.key==='Enter') addPlayer()">
+        <button class="add-btn" onclick="addPlayer()">+</button>
+      </div>
+
+      <div id="players-list" class="players-list"></div>
+    </div>
+
+    <div class="bottom-bar">
+      <button class="btn btn-primary btn-full" onclick="goToCategories()">Next: Choose Category ›</button>
     </div>
   </div>
 
-  <!-- Scripts -->
-  <script src="words.js"></script>
-  <script src="questions.js"></script>
-  <script src="app.js"></script>
+  <!-- ── Screen: Categories (Separate Menu) ───────────────── -->
+  <div id="screen-categories" class="screen">
+    <div class="screen-topbar">
+      <button class="back-btn" onclick="playSound('click'); showScreen('screen-setup')">‹</button>
+      <h2 class="topbar-title">Choose Category</h2>
+      <button class="icon-btn" onclick="openSettings()">⚙️</button>
+    </div>
+
+    <!-- Category Grid panel -->
+    <div class="glass-panel">
+      <div class="section-header">
+        <span class="section-title">Select Pack</span>
+      </div>
+
+      <div id="categories-grid" class="cat-grid"></div>
+
+      <!-- Custom pack entry -->
+      <div id="custom-word-entry" class="custom-entry" style="display:none">
+        <div class="custom-row">
+          <input id="custom-civ-word" type="text" placeholder="Add a custom word (e.g. Pizza)" autocomplete="off">
+          <button class="add-btn" onclick="addCustomWord()">+</button>
+        </div>
+        <span id="custom-words-count" class="custom-count">0 words loaded</span>
+        <button class="btn-link" onclick="clearCustom()">Clear custom words</button>
+      </div>
+
+      <div id="custom-question-entry" class="custom-entry" style="display:none">
+        <div class="custom-row">
+          <input id="custom-normal-q" type="text" placeholder="Normal question…" autocomplete="off">
+        </div>
+        <div class="custom-row">
+          <input id="custom-liar-q" type="text" placeholder="Liar's question…" autocomplete="off">
+          <button class="add-btn" onclick="addCustomQuestion()">+</button>
+        </div>
+        <span id="custom-questions-count" class="custom-count" style="display:none">0 question pairs loaded</span>
+        <button class="btn-link" onclick="clearCustom()">Clear custom questions</button>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <button class="btn btn-primary btn-full" onclick="startGame()">▶ Start Game</button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Reveal Intro ─────────────────────────────── -->
+  <div id="screen-reveal-intro" class="screen screen-center">
+    <div class="pass-device-card">
+      <p class="pass-label">PASS THE DEVICE TO</p>
+      <div id="ri-avatar" class="pass-avatar"></div>
+      <h2 id="ri-name" class="pass-name">—</h2>
+      <p class="pass-privacy">👁️ Keep your role secret!</p>
+      <p id="ri-progress" class="pass-progress">1 of 4</p>
+      <button class="btn btn-primary btn-wide" onclick="tapReveal()">I'm Ready — Show My Role</button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Reveal Card ──────────────────────────────── -->
+  <div id="screen-reveal-card" class="screen screen-center">
+    <p class="tap-hint-top">Tap the card to reveal your role</p>
+
+    <div id="reveal-card" class="card-3d" onclick="flipCard()">
+      <!-- Back -->
+      <div class="card-side card-back">
+        <span class="card-badge">SECRET ROLE</span>
+        <span class="card-mystery">🔮</span>
+        <span class="card-tap">TAP TO REVEAL</span>
+      </div>
+      <!-- Front -->
+      <div id="reveal-card-front" class="card-side card-front">
+        <div class="card-player-row">
+          <div id="rc-avatar" class="rc-avatar"></div>
+          <span id="rc-name" class="rc-pname">—</span>
+        </div>
+        <div class="card-role-area">
+          <span id="rc-label" class="rc-label">—</span>
+          <div id="rc-secret" class="rc-secret"></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-wide" onclick="nextReveal()">Done — Pass Device ›</button>
+  </div>
+
+  <!-- ── Screen: Describe (Timer) ─────────────────────────── -->
+  <div id="screen-describe" class="screen">
+    <div class="screen-topbar">
+      <h2 class="topbar-title">Describe Phase</h2>
+      <span id="desc-progress" class="badge">1/4</span>
+    </div>
+
+    <div class="active-player-banner">
+      <div id="desc-avatar" class="act-avatar"></div>
+      <span id="desc-name" class="act-name">—</span>
+    </div>
+
+    <div class="timer-wrap" id="timer-ring-wrap">
+      <svg class="timer-svg" viewBox="0 0 120 120">
+        <circle class="t-bg"  cx="60" cy="60" r="50"/>
+        <circle id="timer-ring" class="t-ring" cx="60" cy="60" r="50"/>
+      </svg>
+      <span id="timer-val" class="timer-val">30</span>
+    </div>
+
+    <button id="timer-btn" class="btn btn-primary" onclick="toggleTimer()">Start Timer</button>
+
+    <div id="desc-queue" class="queue-list"></div>
+
+    <div class="bottom-bar">
+      <button class="btn btn-cyan btn-full" onclick="nextDescriber()">Next Player ›</button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Vote ──────────────────────────────────────── -->
+  <div id="screen-vote" class="screen">
+    <div class="screen-topbar">
+      <h2 class="topbar-title">Vote Out</h2>
+    </div>
+    <p class="desc-text">Who do you think is the Imposter? Tap to vote them out.</p>
+    <div id="vote-grid" class="vote-grid"></div>
+  </div>
+
+  <!-- ── Screen: Imposter Guess ───────────────────────────── -->
+  <div id="screen-guess" class="screen screen-center">
+    <div class="guess-card">
+      <div class="guess-icon">😈</div>
+      <h2>Last Chance!</h2>
+      <p class="desc-text"><span id="guesser-name" class="highlight">The Imposter</span> — guess the secret word to steal the win!</p>
+      <input id="guess-input" type="text" class="guess-input" placeholder="Type your guess…"
+             autocomplete="off" onkeydown="if(event.key==='Enter') submitGuess()">
+      <button class="btn btn-accent btn-full" onclick="submitGuess()">Submit Guess</button>
+    </div>
+  </div>
+
+  <!-- ── Screen: Game Over ─────────────────────────────────── -->
+  <div id="screen-gameover" class="screen">
+    <div class="screen-topbar">
+      <h2 class="topbar-title">Game Over</h2>
+    </div>
+
+    <div id="go-banner" class="winner-banner">—</div>
+    <div id="go-word-reveal" class="word-reveal-box"></div>
+    <div id="go-summary" class="go-summary"></div>
+
+    <div class="bottom-bar go-btns">
+      <button class="btn btn-primary btn-full" onclick="playAgain()">▶ Play Again (Same Category)</button>
+      <button class="btn btn-secondary btn-full" onclick="goToCategories()">🎲 Change Category</button>
+      <button class="btn btn-ghost btn-full" onclick="playSound('click'); showScreen('screen-home')">🏠 Main Menu</button>
+    </div>
+  </div>
+
+</div><!-- /app-container -->
+
+<!-- ════════════════════════════════════════════════
+     MODALS
+════════════════════════════════════════════════ -->
+
+<!-- Vote confirm -->
+<div id="vote-confirm-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3 class="modal-title">Vote Out?</h3>
+    <p>Eliminate <strong id="vote-modal-name">—</strong> from the game?</p>
+    <div class="modal-btns">
+      <button class="btn btn-accent" onclick="doEliminate()">Yes, Vote Out</button>
+      <button class="btn btn-ghost"  onclick="closeModal('vote-confirm-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="settings-modal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header-row">
+      <h3 class="modal-title">⚙️ Settings</h3>
+      <button class="icon-btn" onclick="closeModal('settings-modal')">✕</button>
+    </div>
+    <p class="modal-sub">Settings apply to the next round and are saved automatically.</p>
+
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-title">Imposters per Round</span>
+        <span class="setting-desc">How many players are imposters (1–3)</span>
+      </div>
+      <div class="step-counter">
+        <button class="counter-btn" onclick="settingStep('count',-1)">−</button>
+        <span id="si-count">1</span>
+        <button class="counter-btn" onclick="settingStep('count', 1)">+</button>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-title">Timer Duration</span>
+        <span class="setting-desc">Seconds per player during describe phase</span>
+      </div>
+      <div class="step-counter">
+        <button class="counter-btn" onclick="settingStep('timer',-15)">−</button>
+        <span id="si-timer">30s</span>
+        <button class="counter-btn" onclick="settingStep('timer', 15)">+</button>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-title">Imposter Reveals Last</span>
+        <span class="setting-desc">Imposter always gets their card after everyone else</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="si-last" onchange="toggleSetting('imposterGoesLast')">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-info">
+        <span class="setting-title">Category Hint for Imposter</span>
+        <span class="setting-desc">Imposter sees the category name as a clue</span>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="si-hint" onchange="toggleSetting('imposterHint')">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- Rules -->
+<div id="rules-modal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header-row">
+      <h3 class="modal-title">📖 How to Play</h3>
+      <button class="icon-btn" onclick="closeModal('rules-modal')">✕</button>
+    </div>
+
+    <div class="rules-body">
+      <h4>🕵️ Classic Mode</h4>
+      <ul>
+        <li><strong>Everyone</strong> receives the same secret word (e.g. "Pizza").</li>
+        <li>The <strong>Imposter</strong> gets nothing — they must bluff!</li>
+        <li>Players take turns giving one-word clues. Then vote out the suspected Imposter.</li>
+        <li>If caught, the Imposter gets one final guess at the word to steal the win!</li>
+      </ul>
+
+      <h4>💬 Find the Liar Mode</h4>
+      <ul>
+        <li>Everyone receives the same question — except the <strong>Liar</strong> who gets a different but similar one.</li>
+        <li>All players answer their question aloud. The group votes out who they think answered differently.</li>
+        <li>Find the Liar before they blend in!</li>
+      </ul>
+
+      <h4>🏆 Win Conditions</h4>
+      <ul>
+        <li><strong>Civilians win</strong> by voting out all imposters.</li>
+        <li><strong>Imposter wins</strong> if they equal or outnumber civilians — or guess the secret word!</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script src="words.js"></script>
+<script src="questions.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

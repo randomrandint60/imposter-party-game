@@ -1,257 +1,115 @@
-// Words database for Imposter Game - Classic Mode
-// Each pair has a Civilian word and a slightly similar Undercover word.
+// ============================================================
+//  Imposter Party Game — Words Database
+//  Classic Mode: everyone knows the word except the Imposter
+// ============================================================
 
 const IMPOSTER_WORDS = {
   food: {
-    name: "Food & Drinks",
-    icon: "🍔",
-    pairs: [
-      { civilian: "Pizza", undercover: "Burger" },
-      { civilian: "Coffee", undercover: "Tea" },
-      { civilian: "Sushi", undercover: "Sashimi" },
-      { civilian: "Beer", undercover: "Wine" },
-      { civilian: "Chocolate", undercover: "Ice Cream" },
-      { civilian: "Onion", undercover: "Garlic" },
-      { civilian: "Coca-Cola", undercover: "Pepsi" },
-      { civilian: "Butter", undercover: "Margarine" },
-      { civilian: "Lemon", undercover: "Lime" },
-      { civilian: "Milk", undercover: "Yogurt" },
-      { civilian: "Donut", undercover: "Croissant" },
-      { civilian: "Hot Dog", undercover: "Sausage" },
-      { civilian: "Pancake", undercover: "Waffle" },
-      { civilian: "Apple", undercover: "Pear" },
-      { civilian: "Pasta", undercover: "Rice" }
+    name: "Food & Drinks", icon: "🍔",
+    words: [
+      "Pizza","Sushi","Burger","Tacos","Pasta","Ice Cream","Hot Dog","Pancake",
+      "Waffle","Coffee","Tea","Beer","Wine","Chocolate","Cookie","Donut",
+      "Croissant","Ramen","Avocado","Bacon","Steak","Lobster","Cheesecake",
+      "Fried Chicken","Smoothie","Lemonade","Milkshake","Burrito","Nachos",
+      "Spaghetti","Lasagna","Curry","Dim Sum","Falafel","Gyoza","Kebab",
+      "Marshmallow","Pretzel","Tiramisu","Mango","Strawberry","Watermelon",
+      "Pineapple","Coconut","Popcorn","French Fries","Onion Rings","Boba Tea",
+      "Pho","Churros","Baklava","Mochi"
     ]
   },
   animals: {
-    name: "Animals & Nature",
-    icon: "🦁",
-    pairs: [
-      { civilian: "Lion", undercover: "Tiger" },
-      { civilian: "Dog", undercover: "Cat" },
-      { civilian: "Dolphin", undercover: "Whale" },
-      { civilian: "Eagle", undercover: "Falcon" },
-      { civilian: "Crocodile", undercover: "Alligator" },
-      { civilian: "Bee", undercover: "Wasp" },
-      { civilian: "Shark", undercover: "Whale Shark" },
-      { civilian: "Horse", undercover: "Donkey" },
-      { civilian: "Wolf", undercover: "Fox" },
-      { civilian: "Bear", undercover: "Grizzly Bear" },
-      { civilian: "Tree", undercover: "Shrub" },
-      { civilian: "River", undercover: "Lake" },
-      { civilian: "Mountain", undercover: "Hill" },
-      { civilian: "Rain", undercover: "Snow" },
-      { civilian: "Rose", undercover: "Tulip" }
-    ]
-  },
-  travel: {
-    name: "Travel & Places",
-    icon: "✈️",
-    pairs: [
-      { civilian: "Paris", undercover: "London" },
-      { civilian: "Tokyo", undercover: "Seoul" },
-      { civilian: "New York", undercover: "Los Angeles" },
-      { civilian: "Beach", undercover: "Pool" },
-      { civilian: "Hotel", undercover: "Hostel" },
-      { civilian: "Airplane", undercover: "Helicopter" },
-      { civilian: "Train", undercover: "Subway" },
-      { civilian: "Ship", undercover: "Yacht" },
-      { civilian: "Suitcase", undercover: "Backpack" },
-      { civilian: "Map", undercover: "Compass" },
-      { civilian: "Castle", undercover: "Palace" },
-      { civilian: "Museum", undercover: "Gallery" },
-      { civilian: "Desert", undercover: "Savanna" },
-      { civilian: "Forest", undercover: "Jungle" },
-      { civilian: "Mountain", undercover: "Volcano" }
+    name: "Animals & Nature", icon: "🦁",
+    words: [
+      "Lion","Elephant","Dolphin","Eagle","Shark","Gorilla","Cheetah","Giraffe",
+      "Penguin","Flamingo","Wolf","Bear","Snake","Crocodile","Kangaroo","Koala",
+      "Tiger","Leopard","Parrot","Peacock","Octopus","Jellyfish","Chameleon",
+      "Panda","Porcupine","Platypus","Narwhal","Axolotl","Red Fox","Manta Ray",
+      "Hummingbird","Polar Bear","Grizzly Bear","Wolverine","Honey Badger",
+      "Sloth","Armadillo","Capybara","Komodo Dragon","Snow Leopard","Blue Whale",
+      "Orca","Toucan","Kiwi","Bison","Mantis Shrimp","Tardigrade","Axolotl",
+      "Quokka","Fossa","Pangolin"
     ]
   },
   movies: {
-    name: "Movies & TV",
-    icon: "🎬",
-    pairs: [
-      { civilian: "Cinema", undercover: "Theatre" },
-      { civilian: "Batman", undercover: "Spider-Man" },
-      { civilian: "Harry Potter", undercover: "Percy Jackson" },
-      { civilian: "Star Wars", undercover: "Star Trek" },
-      { civilian: "Anime", undercover: "Cartoon" },
-      { civilian: "Horror", undercover: "Thriller" },
-      { civilian: "Comedy", undercover: "Drama" },
-      { civilian: "Popcorn", undercover: "Nachos" },
-      { civilian: "Actor", undercover: "Director" },
-      { civilian: "Hollywood", undercover: "Bollywood" },
-      { civilian: "Oscar", undercover: "Emmy" },
-      { civilian: "Netflix", undercover: "Disney+" },
-      { civilian: "Iron Man", undercover: "Captain America" },
-      { civilian: "James Bond", undercover: "Ethan Hunt" },
-      { civilian: "Vampire", undercover: "Werewolf" }
-    ]
-  },
-  gaming: {
-    name: "Gaming & Geek",
-    icon: "🎮",
-    pairs: [
-      { civilian: "PlayStation", undercover: "Xbox" },
-      { civilian: "Minecraft", undercover: "Roblox" },
-      { civilian: "Chess", undercover: "Checkers" },
-      { civilian: "Pokemon", undercover: "Digimon" },
-      { civilian: "Keyboard", undercover: "Mouse" },
-      { civilian: "Controller", undercover: "Joystick" },
-      { civilian: "VR Headset", undercover: "AR Glasses" },
-      { civilian: "Mario", undercover: "Sonic" },
-      { civilian: "Dragon", undercover: "Griffin" },
-      { civilian: "Sword", undercover: "Shield" },
-      { civilian: "Spell", undercover: "Potion" },
-      { civilian: "Robot", undercover: "Cyborg" },
-      { civilian: "Alien", undercover: "Predator" },
-      { civilian: "Dungeons & Dragons", undercover: "Pathfinder" },
-      { civilian: "Fortnite", undercover: "PUBG" }
+    name: "Movies & TV", icon: "🎬",
+    words: [
+      "Titanic","Avatar","The Lion King","Star Wars","Avengers","Jurassic Park",
+      "The Matrix","Batman","Spider-Man","Iron Man","Harry Potter","The Godfather",
+      "Frozen","Shrek","Toy Story","Finding Nemo","Inception","Interstellar",
+      "Breaking Bad","Game of Thrones","Stranger Things","Friends","The Office",
+      "Squid Game","Top Gun","John Wick","Gladiator","Oppenheimer","Barbie",
+      "The Dark Knight","Fight Club","Forrest Gump","Pulp Fiction","Jaws",
+      "Back to the Future","Indiana Jones","Die Hard","Rocky","The Shining",
+      "Mad Max","Dune","Black Panther","Wonder Woman","Guardians of the Galaxy",
+      "The Last of Us","Wednesday","Peaky Blinders","Chernobyl","Euphoria",
+      "Cobra Kai","Yellowstone"
     ]
   },
   sports: {
-    name: "Sports & Hobbies",
-    icon: "🏆",
-    pairs: [
-      { civilian: "Football", undercover: "Rugby" },
-      { civilian: "Tennis", undercover: "Badminton" },
-      { civilian: "Running", undercover: "Walking" },
-      { civilian: "Swimming", undercover: "Diving" },
-      { civilian: "Gym", undercover: "Yoga" },
-      { civilian: "Guitar", undercover: "Piano" },
-      { civilian: "Painting", undercover: "Drawing" },
-      { civilian: "Photography", undercover: "Videography" },
-      { civilian: "Chess", undercover: "Go" },
-      { civilian: "Reading", undercover: "Writing" },
-      { civilian: "Skiing", undercover: "Snowboarding" },
-      { civilian: "Bicycle", undercover: "Scooter" },
-      { civilian: "Camping", undercover: "Hiking" },
-      { civilian: "Fishing", undercover: "Hunting" },
-      { civilian: "Surfboard", undercover: "Skateboard" }
+    name: "Sports & Games", icon: "⚽",
+    words: [
+      "Soccer","Basketball","Tennis","Baseball","American Football","Swimming","Boxing",
+      "Golf","Volleyball","Cricket","Ice Hockey","Rugby","Skiing","Skateboarding",
+      "Surfing","Gymnastics","Wrestling","Archery","Fencing","Table Tennis",
+      "Badminton","Rock Climbing","Cycling","Marathon","Triathlon","Poker",
+      "Chess","Bowling","Darts","Snowboarding","Karate","Judo","Taekwondo",
+      "Weightlifting","Rowing","Sailing","Lacrosse","Handball","Squash",
+      "Curling","Bobsled","Biathlon","Diving","Water Polo","Parkour",
+      "Skydiving","Motocross","Formula 1","NASCAR","Esports"
     ]
   },
-  objects: {
-    name: "Everyday Objects",
-    icon: "🛋️",
-    pairs: [
-      { civilian: "Mirror", undercover: "Window" },
-      { civilian: "Sofa", undercover: "Armchair" },
-      { civilian: "Pillow", undercover: "Blanket" },
-      { civilian: "Mug", undercover: "Cup" },
-      { civilian: "Key", undercover: "Lock" },
-      { civilian: "Clock", undercover: "Watch" },
-      { civilian: "Pen", undercover: "Pencil" },
-      { civilian: "Book", undercover: "Notebook" },
-      { civilian: "Candle", undercover: "Lamp" },
-      { civilian: "Umbrella", undercover: "Raincoat" },
-      { civilian: "Wallet", undercover: "Purse" },
-      { civilian: "Soap", undercover: "Shampoo" },
-      { civilian: "Toothbrush", undercover: "Floss" },
-      { civilian: "Spoon", undercover: "Fork" },
-      { civilian: "Scissors", undercover: "Knife" }
-    ]
-  },
-  occupations: {
-    name: "Occupations",
-    icon: "💼",
-    pairs: [
-      { civilian: "Doctor", undercover: "Nurse" },
-      { civilian: "Teacher", undercover: "Professor" },
-      { civilian: "Police", undercover: "Firefighter" },
-      { civilian: "Chef", undercover: "Baker" },
-      { civilian: "Pilot", undercover: "Astronaut" },
-      { civilian: "Artist", undercover: "Designer" },
-      { civilian: "Lawyer", undercover: "Judge" },
-      { civilian: "Writer", undercover: "Journalist" },
-      { civilian: "Actor", undercover: "Singer" },
-      { civilian: "Farmer", undercover: "Gardener" },
-      { civilian: "Builder", undercover: "Architect" },
-      { civilian: "Soldier", undercover: "Sailor" },
-      { civilian: "Waiter", undercover: "Bartender" },
-      { civilian: "Barber", undercover: "Hairdresser" },
-      { civilian: "Scientist", undercover: "Engineer" }
-    ]
-  },
-  popculture: {
-    name: "Pop Culture",
-    icon: "🦸",
-    pairs: [
-      { civilian: "Superman", undercover: "Spider-Man" },
-      { civilian: "Barbie", undercover: "Ken" },
-      { civilian: "Mickey Mouse", undercover: "Donald Duck" },
-      { civilian: "Sherlock Holmes", undercover: "Watson" },
-      { civilian: "Pikachu", undercover: "Eevee" },
-      { civilian: "Taylor Swift", undercover: "Beyoncé" },
-      { civilian: "Elon Musk", undercover: "Jeff Bezos" },
-      { civilian: "Santa Claus", undercover: "Easter Bunny" },
-      { civilian: "Dracula", undercover: "Frankenstein" },
-      { civilian: "Hercules", undercover: "Achilles" },
-      { civilian: "Yoda", undercover: "Darth Vader" },
-      { civilian: "Gandalf", undercover: "Dumbledore" },
-      { civilian: "Shrek", undercover: "Donkey" },
-      { civilian: "Simba", undercover: "Mufasa" },
-      { civilian: "Peter Pan", undercover: "Robin Hood" }
+  places: {
+    name: "Places & Travel", icon: "🌍",
+    words: [
+      "Paris","New York","Tokyo","London","Dubai","Sydney","Rome","Barcelona",
+      "Amsterdam","Bangkok","Las Vegas","Miami","Los Angeles","Chicago","Toronto",
+      "Seoul","Singapore","Istanbul","Cairo","Rio de Janeiro","Bali","Maldives",
+      "Iceland","Venice","Prague","Santorini","Machu Picchu","Times Square",
+      "Eiffel Tower","Great Wall of China","Niagara Falls","Grand Canyon",
+      "Amazon Rainforest","Sahara Desert","Mount Everest","Great Barrier Reef",
+      "Colosseum","Stonehenge","Pyramids of Giza","Taj Mahal","Angkor Wat",
+      "Petra","Vatican City","Monaco","Hong Kong","Shanghai","Mumbai",
+      "Cape Town","Buenos Aires","Havana","Antarctica"
     ]
   },
   tech: {
-    name: "Tech & Brands",
-    icon: "💻",
-    pairs: [
-      { civilian: "Apple", undercover: "Samsung" },
-      { civilian: "Google", undercover: "Yahoo" },
-      { civilian: "Facebook", undercover: "Instagram" },
-      { civilian: "YouTube", undercover: "TikTok" },
-      { civilian: "Zoom", undercover: "Skype" },
-      { civilian: "Windows", undercover: "macOS" },
-      { civilian: "Android", undercover: "iOS" },
-      { civilian: "Laptop", undercover: "Desktop" },
-      { civilian: "Wifi", undercover: "Bluetooth" },
-      { civilian: "Email", undercover: "Chat" },
-      { civilian: "Amazon", undercover: "eBay" },
-      { civilian: "Tesla", undercover: "Porsche" },
-      { civilian: "Spotify", undercover: "Apple Music" },
-      { civilian: "Uber", undercover: "Lyft" },
-      { civilian: "Bitcoin", undercover: "Ethereum" }
+    name: "Tech & Science", icon: "💻",
+    words: [
+      "iPhone","Google","YouTube","Netflix","Tesla","Bitcoin","ChatGPT",
+      "Instagram","TikTok","Twitter / X","Amazon","Apple Watch","PlayStation","Xbox",
+      "Nintendo Switch","AirPods","Robot","Drone","Virtual Reality","3D Printer",
+      "Smartwatch","Bluetooth","WiFi","Satellite","Black Hole","DNA","Vaccine",
+      "Rocket","Quantum Computer","Artificial Intelligence","Self-Driving Car",
+      "SpaceX","NASA","Microchip","Laser","Radar","Submarine","Space Station",
+      "Mars Rover","Telescope","Microscope","Solar Panel","Wind Turbine",
+      "Hologram","Cybersecurity","Blockchain","Cloud Computing","Neural Network",
+      "Augmented Reality","Nuclear Reactor","Deepfake"
     ]
   },
-  history: {
-    name: "History & Myth",
-    icon: "🏛️",
-    pairs: [
-      { civilian: "Zeus", undercover: "Jupiter" },
-      { civilian: "Thor", undercover: "Odin" },
-      { civilian: "Mummy", undercover: "Zombie" },
-      { civilian: "Gladiator", undercover: "Knight" },
-      { civilian: "Pirate", undercover: "Viking" },
-      { civilian: "Pyramids", undercover: "Sphinx" },
-      { civilian: "Colosseum", undercover: "Pantheon" },
-      { civilian: "Cleopatra", undercover: "Nefertiti" },
-      { civilian: "Julius Caesar", undercover: "Augustus" },
-      { civilian: "Atlantis", undercover: "El Dorado" },
-      { civilian: "Pegasus", undercover: "Unicorn" },
-      { civilian: "Pharaoh", undercover: "Emperor" },
-      { civilian: "Samurai", undercover: "Ninja" },
-      { civilian: "Medusa", undercover: "Siren" },
-      { civilian: "Ghost", undercover: "Phantom" }
+  jobs: {
+    name: "Jobs & People", icon: "👔",
+    words: [
+      "Doctor","Teacher","Chef","Police Officer","Firefighter","Pilot","Actor",
+      "Scientist","Engineer","Lawyer","Nurse","Astronaut","Architect","Photographer",
+      "Musician","Athlete","Writer","Artist","Surgeon","Detective","Spy",
+      "President","CEO","Soldier","Sailor","Farmer","Mechanic","Barber",
+      "Coach","Judge","Librarian","Dentist","Pharmacist","Psychologist",
+      "Accountant","Journalist","Translator","Diplomat","Magician","Comedian",
+      "Influencer","Gamer","Hacker","Inventor","Explorer","Marine Biologist",
+      "Archaeologist","Historian","Philosopher","Stuntman"
     ]
   },
-  science: {
-    name: "Science & School",
-    icon: "🔬",
-    pairs: [
-      { civilian: "Physics", undercover: "Chemistry" },
-      { civilian: "Math", undercover: "Geometry" },
-      { civilian: "Astronomy", undercover: "Astrology" },
-      { civilian: "Atom", undercover: "Molecule" },
-      { civilian: "Telescope", undercover: "Microscope" },
-      { civilian: "Calculator", undercover: "Ruler" },
-      { civilian: "Library", undercover: "Classroom" },
-      { civilian: "Homework", undercover: "Exam" },
-      { civilian: "Backpack", undercover: "Pencil Case" },
-      { civilian: "Blackboard", undercover: "Whiteboard" },
-      { civilian: "Mars", undercover: "Venus" },
-      { civilian: "Sun", undercover: "Moon" },
-      { civilian: "Gravity", undercover: "Magnetism" },
-      { civilian: "Water", undercover: "Ice" },
-      { civilian: "Dinosaur", undercover: "Fossil" }
+  culture: {
+    name: "Pop Culture", icon: "🎨",
+    words: [
+      "Taylor Swift","BTS","Beyoncé","Elon Musk","MrBeast","Minecraft","Fortnite",
+      "Among Us","Roblox","Mario","Pokémon","Pikachu","Goku","Naruto","Disney",
+      "Marvel","Grammy Awards","Oscars","Super Bowl","World Cup","Olympics",
+      "Halloween","Christmas","Mona Lisa","Beethoven","Shakespeare","Harry Styles",
+      "Billie Eilish","Dua Lipa","Ariana Grande","Drake","Eminem","Lady Gaga",
+      "Justin Bieber","Selena Gomez","Adele","Ed Sheeran","Bruno Mars",
+      "The Weeknd","Kendrick Lamar","Olivia Rodrigo","Bad Bunny","Cardi B",
+      "Post Malone","Lil Nas X","Lizzo","Zendaya","Tom Holland","Ryan Reynolds"
     ]
   }
 };
