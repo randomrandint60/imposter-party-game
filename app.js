@@ -73,7 +73,8 @@ function toggleSetting(key) { S[key] = !S[key]; saveSettings(); }
 const GS = {
   mode: 'classic',
   players: [],
-  selectedCat: null,
+  selectedCats: [],
+  chosenCatName: '',
 
   // round data
   word: '', normalQ: '', liarQ: '',
@@ -217,7 +218,7 @@ function shake(el) {
 function setGameMode(mode) {
   playSound('click');
   GS.mode = mode;
-  GS.selectedCat = null;
+  GS.selectedCats = [];
   renderCatGrid();
   // show / hide custom inputs
   const isClassic = mode === 'classic';
@@ -237,7 +238,7 @@ function renderCatGrid() {
     const cat = db[key];
     const cnt = cat.words ? cat.words.length : cat.pairs.length;
     const card = document.createElement('div');
-    card.className = 'category-card' + (GS.selectedCat === key ? ' selected' : '');
+    card.className = 'category-card' + (GS.selectedCats.includes(key) ? ' selected' : '');
     card.id = `cat-${key}`;
     card.onclick = () => selectCat(key);
     card.innerHTML = `<span class="cat-emoji">${cat.icon}</span>
@@ -248,7 +249,7 @@ function renderCatGrid() {
   // custom
   const customCnt = GS.mode === 'classic' ? GS.customWords.length : GS.customQuestions.length;
   const cc = document.createElement('div');
-  cc.className = 'category-card' + (GS.selectedCat === 'custom' ? ' selected' : '');
+  cc.className = 'category-card' + (GS.selectedCats.includes('custom') ? ' selected' : '');
   cc.id = 'cat-custom';
   cc.onclick = () => selectCat('custom');
   cc.innerHTML = `<span class="cat-emoji">✨</span>
@@ -259,10 +260,16 @@ function renderCatGrid() {
 
 function selectCat(key) {
   playSound('click');
-  GS.selectedCat = key;
-  document.querySelectorAll('.category-card').forEach(c => c.classList.remove('selected'));
-  const el = document.getElementById(`cat-${key}`);
-  if (el) el.classList.add('selected');
+  const idx = GS.selectedCats.indexOf(key);
+  if (idx > -1) {
+    GS.selectedCats.splice(idx, 1);
+    const el = document.getElementById(`cat-${key}`);
+    if (el) el.classList.remove('selected');
+  } else {
+    GS.selectedCats.push(key);
+    const el = document.getElementById(`cat-${key}`);
+    if (el) el.classList.add('selected');
+  }
 }
 
 function goToCategories() {
@@ -317,26 +324,45 @@ function clearCustom() {
 
 // ── Start game round ──────────────────────────────────────────
 function startGame() {
-  if (!GS.selectedCat) { notify('Pick a category first!'); return; }
+  if (!GS.selectedCats.length) { notify('Pick at least one category!'); return; }
 
   // clamp imposter count
   const maxImp = Math.max(1, GS.players.length - 2);
   const impCount = Math.min(S.imposterCount, maxImp);
 
-  // pick word / question
+  let chosenItem = null;
+
+  // pick word / question from all selected categories
   if (GS.mode === 'classic') {
-    let pool = GS.selectedCat === 'custom'
-      ? [...GS.customWords]
-      : (IMPOSTER_WORDS[GS.selectedCat].words || IMPOSTER_WORDS[GS.selectedCat].pairs.map(p=>p.civilian));
-    if (!pool.length) { notify('No words in this category!'); return; }
-    GS.word = pool[Math.floor(Math.random() * pool.length)];
+    let pool = [];
+    GS.selectedCats.forEach(cat => {
+      if (cat === 'custom') {
+        GS.customWords.forEach(w => pool.push({ word: w, catName: 'Custom' }));
+      } else {
+        const catWords = IMPOSTER_WORDS[cat].words || IMPOSTER_WORDS[cat].pairs.map(p=>p.civilian);
+        const name = IMPOSTER_WORDS[cat].name;
+        catWords.forEach(w => pool.push({ word: w, catName: name }));
+      }
+    });
+    if (!pool.length) { notify('No words in selected categories!'); return; }
+    chosenItem = pool[Math.floor(Math.random() * pool.length)];
+    GS.word = chosenItem.word;
+    GS.chosenCatName = chosenItem.catName;
   } else {
-    let pool = GS.selectedCat === 'custom'
-      ? [...GS.customQuestions]
-      : IMPOSTER_QUESTIONS[GS.selectedCat].pairs;
-    if (!pool.length) { notify('No questions in this category!'); return; }
-    const q = pool[Math.floor(Math.random() * pool.length)];
-    GS.normalQ = q.normal; GS.liarQ = q.liar;
+    let pool = [];
+    GS.selectedCats.forEach(cat => {
+      if (cat === 'custom') {
+        GS.customQuestions.forEach(q => pool.push({ q, catName: 'Custom' }));
+      } else {
+        const name = IMPOSTER_QUESTIONS[cat].name;
+        IMPOSTER_QUESTIONS[cat].pairs.forEach(q => pool.push({ q, catName: name }));
+      }
+    });
+    if (!pool.length) { notify('No questions in selected categories!'); return; }
+    chosenItem = pool[Math.floor(Math.random() * pool.length)];
+    GS.normalQ = chosenItem.q.normal; 
+    GS.liarQ = chosenItem.q.liar;
+    GS.chosenCatName = chosenItem.catName;
   }
 
   playSound('click');
@@ -415,9 +441,7 @@ function tapReveal() {
       front.classList.add('role-imposter');
       label.textContent = '🔴 You are the Imposter!';
       if (S.imposterHint) {
-        const catName = GS.selectedCat==='custom' ? 'Custom'
-          : (IMPOSTER_WORDS[GS.selectedCat]?.name || GS.selectedCat);
-        secret.innerHTML = `<span class="rc-sub">Hint — Category:</span><strong style="color:var(--yellow)">${esc(catName)}</strong>`;
+        secret.innerHTML = `<span class="rc-sub">Hint — Category:</span><strong style="color:var(--yellow)">${esc(GS.chosenCatName)}</strong>`;
       } else {
         secret.innerHTML = `<span class="rc-sub imp-msg">You have NO word.<br>Blend in &amp; bluff!</span>`;
       }
