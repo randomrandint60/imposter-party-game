@@ -382,11 +382,7 @@ function startGame() {
 
   // build reveal queue
   let queue = [...GS.players];
-  if (S.imposterGoesLast) {
-    queue = [...queue.filter(p=>p.role!=='imposter'), ...queue.filter(p=>p.role==='imposter')];
-  } else {
-    shuffle(queue);
-  }
+  shuffle(queue);
   GS.revealQueue = queue;
   GS.revealIdx   = 0;
 
@@ -490,6 +486,17 @@ function nextReveal() {
 // ── Describe phase ────────────────────────────────────────────
 function startDescribePhase() {
   GS.descQueue = shuffle([...GS.players.filter(p=>p.active)]);
+  
+  if (S.imposterGoesLast && GS.descQueue.length > 1) {
+    if (GS.descQueue[0].role === 'imposter') {
+      const civIdx = GS.descQueue.findIndex(p => p.role !== 'imposter');
+      if (civIdx > -1) {
+        // Swap so imposter doesn't go first
+        [GS.descQueue[0], GS.descQueue[civIdx]] = [GS.descQueue[civIdx], GS.descQueue[0]];
+      }
+    }
+  }
+
   GS.descIdx   = 0;
   renderDescQueue();
   setupDescriber();
