@@ -1,7 +1,8 @@
 /* ============================================================
    Imposter Party — Web Edition  |  app.js
    Complete game engine with settings, multi-round, hints, 
-   custom avatar selector, and real-time online same-room multiplayer.
+   custom avatar selector, and real-time online same-room multiplayer
+   fully optimized using Socket.io for fast room messaging.
    ============================================================ */
 
 // ── Realtime Signaling Settings ──────────────────────────────
@@ -157,67 +158,39 @@ function notify(msg) {
   notifTimer = setTimeout(() => el.classList.remove('show'), 3500);
 }
 
-// ── Realtime Synchronization WebSockets ───────────────────────
+// ── Realtime Synchronization WebSockets (Socket.io) ───────────
 function initSocket(onConnect) {
-  if (GS.socket && GS.socket.readyState === WebSocket.OPEN) {
+  if (GS.socket && GS.socket.connected) {
     if (onConnect) onConnect();
     return;
   }
   
   notify('Connecting to server (waking up server tier)...');
-  GS.socket = new WebSocket(WS_URL);
   
-  GS.socket.onopen = () => {
+  // Connect to Render Socket.io server
+  GS.socket = io(WS_URL, {
+    transports: ['websocket', 'polling']
+  });
+  
+  GS.socket.on('connect', () => {
     notify('Connected to lobby sync network! 🌐');
     if (onConnect) onConnect();
-  };
+  });
   
-  GS.socket.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      handleSocketMessage(data);
-    } catch(e) {}
-  };
-  
-  GS.socket.onclose = () => {
-    if (GS.isOnline) {
-      notify('Signal lost. Reconnecting to lobby...');
-      setTimeout(() => initSocket(), 3000);
-    }
-  };
-  
-  GS.socket.onerror = () => {
-    notify('Failed to connect to lobby server. Make sure server is hosted.');
-  };
-}
-
-function syncState(action, extraData = {}) {
-  if (GS.isOnline && GS.socket && GS.socket.readyState === WebSocket.OPEN) {
-    GS.socket.send(JSON.stringify({
-      type: 'sync',
-      room: GS.roomCode,
-      action: action,
-      ...extraData
-    }));
-  }
-}
-
-function handleSocketMessage(data) {
-  // Host events
-  if (data.type === 'hosted') {
+  GS.socket.on('room_hosted', (data) => {
     document.getElementById('setup-online-indicator').style.display = 'flex';
     document.getElementById('setup-room-code').textContent = GS.roomCode;
     renderPlayerList();
     showScreen('screen-setup');
-  } 
-  // Joiner events
-  else if (data.type === 'joined') {
+  });
+  
+  GS.socket.on('room_joined', (data) => {
     closeModal('join-modal');
     document.getElementById('lobby-code-val').textContent = GS.roomCode;
     showScreen('screen-lobby');
-  }
-  // Host receiving player joiner info
-  else if (data.type === 'player_joined') {
+  });
+  
+  GS.socket.on('player_joined', (data) => {
     if (GS.isHost) {
       const p = data.player;
       if (!GS.players.some(x => x.id === p.id)) {
@@ -234,24 +207,43 @@ function handleSocketMessage(data) {
         syncLobbyToJoiners();
       }
     }
-  }
-  // Host receiving player quit
-  else if (data.type === 'player_left') {
+  });
+  
+  GS.socket.on('player_left', (data) => {
     if (GS.isHost) {
       GS.players = GS.players.filter(x => x.id !== data.playerId);
       renderPlayerList();
       notify('A player left the room.');
       syncLobbyToJoiners();
     }
-  }
-  // Relay errors
-  else if (data.type === 'error') {
+  });
+  
+  GS.socket.on('room_closed', (data) => {
     notify(data.message);
     leaveLobby();
-  }
-  // State Sync event RELAYED by server
-  else if (data.type === 'sync') {
+  });
+  
+  GS.socket.on('sync_action', (data) => {
     handleGameStateSync(data);
+  });
+  
+  GS.socket.on('disconnect', () => {
+    if (GS.isOnline) {
+      notify('Signal lost. Reconnecting to lobby...');
+    }
+  });
+  
+  GS.socket.on('connect_error', () => {
+    notify('Failed to connect to lobby server. Make sure server is hosted.');
+  });
+}
+
+function syncState(action, extraData = {}) {
+  if (GS.isOnline && GS.socket && GS.socket.connected) {
+    GS.socket.emit('sync_action', {
+      action: action,
+      ...extraData
+    });
   }
 }
 
@@ -307,7 +299,6 @@ function handleGameStateSync(data) {
     GS.timerSecs = data.secs;
     GS.timerActive = data.active;
     const btn = document.getElementById('timer-btn');
-    const wrap = document.getElementById('timer-ring-wrap');
     
     if (GS.timerActive) {
       btn.textContent = 'Pause';
@@ -353,7 +344,6 @@ function handleGameStateSync(data) {
         : (GS.mode === 'classic' ? `a Civilian (word: ${GS.word})` : 'a Normal Citizen');
       notify(`${p.name} was ${who}`);
       
-      // Local win condition checks are host only (host relays result)
       if (GS.isHost) {
         checkEnd();
       }
@@ -375,7 +365,6 @@ function handleGameStateSync(data) {
   }
   // Replay
   else if (data.action === 'reset_round') {
-    // Reset players back to alive state
     GS.players.forEach(p => p.active = true);
     if (GS.isHost) {
       showScreen('screen-categories');
@@ -389,11 +378,11 @@ function handleGameStateSync(data) {
 function hostOnlineRoom() {
   GS.isOnline = true;
   GS.isHost = true;
-  GS.players = []; // clear to let remote player connect
+  GS.players = [];
   GS.roomCode = Math.floor(1000 + Math.random() * 9000).toString();
   
   initSocket(() => {
-    GS.socket.send(JSON.stringify({ type: 'host', room: GS.roomCode }));
+    GS.socket.emit('host_room', { room: GS.roomCode });
   });
 }
 
@@ -452,21 +441,20 @@ function submitJoinRoom() {
   GS.myPlayerId = Date.now();
   
   initSocket(() => {
-    GS.socket.send(JSON.stringify({
-      type: 'join',
+    GS.socket.emit('join_room', {
       room: room,
       playerId: GS.myPlayerId,
       name: name,
       emoji: GS.joinerAvatar.emoji,
       color: GS.joinerAvatar.color
-    }));
+    });
   });
 }
 
 function leaveLobby() {
   playSound('click');
   if (GS.socket) {
-    GS.socket.close();
+    GS.socket.disconnect();
   }
   GS.isOnline = false;
   GS.isHost = false;
@@ -474,10 +462,8 @@ function leaveLobby() {
   GS.socket = null;
   GS.myPlayerId = null;
   
-  // hide indicators
   document.getElementById('setup-online-indicator').style.display = 'none';
   
-  // Reload local players
   const sp = localStorage.getItem('ig_players');
   if (sp) GS.players = JSON.parse(sp);
   renderPlayerList();
@@ -513,7 +499,6 @@ function renderPlayerList() {
     const li = document.createElement('div');
     li.className = 'player-tag';
     
-    // Disable edit inline name for remote players to avoid collision
     const inlineEditAttr = p.isRemote ? 'disabled style="pointer-events:none;"' : '';
     const avatarCursor = p.isRemote ? '' : 'cursor: pointer;';
     const avatarTitle = p.isRemote ? '' : 'title="Edit Icon"';
@@ -873,7 +858,10 @@ function startGame() {
 }
 
 function playAgain() { 
-  if (GS.isOnline && !GS.isHost) return;
+  if (GS.isOnline) {
+    if (!GS.isHost) return;
+    syncState('reset_round');
+  }
   startGame(); 
 }
 
@@ -946,7 +934,6 @@ function tapReveal() {
     }
   }
 
-  // always start unflipped
   const card = document.getElementById('reveal-card');
   if (card) card.classList.remove('flipped');
   showScreen('screen-reveal-card');
@@ -963,14 +950,12 @@ function flipCard() {
 function nextReveal() {
   playSound('click');
   
-  // Unflip the card immediately
   const card = document.getElementById('reveal-card');
   if (card) card.classList.remove('flipped');
 
   GS.revealIdx++;
   
   if (GS.isOnline) {
-    // Sync the reveal screen progress to peers
     syncState('reveal_next', { revealIdx: GS.revealIdx });
   }
 
@@ -984,11 +969,9 @@ function nextReveal() {
 // ── Describe phase ────────────────────────────────────────────
 function startDescribePhase() {
   if (GS.isOnline) {
-    // Only host randomizes speak order and syncs it
     if (GS.isHost) {
       GS.descQueue = shuffle([...GS.players.filter(p=>p.active)]);
       
-      // Imposter never goes first setting
       if (S.imposterGoesLast && GS.descQueue.length > 1) {
         if (GS.descQueue[0].role === 'imposter') {
           const civIdx = GS.descQueue.findIndex(p => p.role !== 'imposter');
@@ -1006,7 +989,6 @@ function startDescribePhase() {
       showScreen('screen-describe');
     }
   } else {
-    // Local flow
     GS.descQueue = shuffle([...GS.players.filter(p=>p.active)]);
     if (S.imposterGoesLast && GS.descQueue.length > 1) {
       if (GS.descQueue[0].role === 'imposter') {
@@ -1044,7 +1026,6 @@ function setupDescriber() {
   setEl('desc-name', p.name);
   setEl('desc-progress', `${GS.descIdx+1} / ${GS.descQueue.length}`);
   
-  // In Online mode, only the speaking player (or Host) can tap next / start timer
   const isMe = (!GS.isHost && p.id === GS.myPlayerId) || (GS.isHost && !p.isRemote);
   const nextBtn = document.querySelector('.screen-describe .btn-cyan');
   
@@ -1143,7 +1124,7 @@ function renderVoteGrid() {
   const g = document.getElementById('vote-grid');
   g.innerHTML = '';
   
-  const isVoter = !GS.isOnline || GS.isHost; // host acts as moderator / handles eliminate input
+  const isVoter = !GS.isOnline || GS.isHost;
 
   GS.players.forEach(p => {
     const card = document.createElement('div');
@@ -1210,7 +1191,6 @@ function checkEnd() {
     return; 
   }
 
-  // continue
   if (GS.isOnline && GS.isHost) {
     syncState('start_vote');
   }
@@ -1225,7 +1205,6 @@ function showGuessScreen() {
   const name = elim.length ? elim[elim.length-1].name : 'The Imposter';
   setEl('guesser-name', name);
   
-  // Disable submission if this player is NOT the imposter (in online mode)
   const isMe = GS.players.some(p => p.id === GS.myPlayerId && p.role === 'imposter');
   const subBtn = document.querySelector('.guess-card .btn-accent');
   const guessInp = document.getElementById('guess-input');
@@ -1298,7 +1277,6 @@ function endGame(winner) {
     banner.classList.add('imposters-win');
   }
 
-  // word reveal
   const box = document.getElementById('go-word-reveal');
   if (GS.mode === 'classic') {
     box.innerHTML = `<div class="wr-label">The Secret Word Was</div>
@@ -1311,7 +1289,6 @@ function endGame(winner) {
       </div>`;
   }
 
-  // summary
   const ul = document.getElementById('go-summary');
   ul.innerHTML = '';
   GS.players.forEach(p => {
@@ -1332,7 +1309,6 @@ function endGame(winner) {
     ul.appendChild(li);
   });
 
-  // Online mode: only host can play again or change category
   const playAgainBtn = document.querySelector('.go-btns button:first-child');
   const changeCatBtn = document.querySelector('.go-btns button:nth-child(2)');
   const mainMenuBtn = document.querySelector('.go-btns button:last-child');

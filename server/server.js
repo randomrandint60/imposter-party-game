@@ -1,123 +1,75 @@
-const WebSocket = require('ws');
+const express = require('express');
 const http = require('http');
+const { Server } = require('socket.io');
 
-const port = process.env.PORT || 8080;
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Imposter Party Realtime Server is Running!\n');
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
 });
 
-const wss = new WebSocket.Server({ server });
+app.get('/', (req, res) => {
+  res.send('Imposter Party Socket.io Server is active!');
+});
 
-// Room structure: rooms[roomCode] = { host: ws, players: { playerId: { ws, name, color, emoji } } }
-const rooms = {};
+io.on('connection', (socket) => {
+  console.log(`User connected: ${socket.id}`);
 
-wss.on('connection', (ws) => {
-  let userRoomCode = null;
-  let userPlayerId = null;
+  // Host creates a room
+  socket.on('host_room', ({ room }) => {
+    socket.join(room);
+    socket.roomCode = room;
+    socket.isHost = true;
+    console.log(`Room hosted: ${room} by socket ${socket.id}`);
+    socket.emit('room_hosted', { room });
+  });
 
-  ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message);
+  // Player joins a room
+  socket.on('join_room', ({ room, playerId, name, color, emoji }) => {
+    socket.join(room);
+    socket.roomCode = room;
+    socket.playerId = playerId;
+    socket.playerName = name;
+    socket.isHost = false;
 
-      if (data.type === 'host') {
-        // Host creates a room
-        userRoomCode = data.room;
-        rooms[userRoomCode] = {
-          host: ws,
-          players: {}
-        };
-        console.log(`Room created: ${userRoomCode}`);
-        ws.send(JSON.stringify({ type: 'hosted', room: userRoomCode }));
-      } 
-      else if (data.type === 'join') {
-        // Player joins a room
-        userRoomCode = data.room;
-        userPlayerId = data.playerId;
+    console.log(`Player ${name} (${playerId}) joined room: ${room}`);
 
-        const room = rooms[userRoomCode];
-        if (!room) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Room not found!' }));
-          return;
-        }
+    // Broadcast to host/room that a player joined
+    socket.to(room).emit('player_joined', {
+      player: { id: playerId, name, color, emoji }
+    });
 
-        room.players[userPlayerId] = {
-          ws: ws,
-          name: data.name,
-          color: data.color,
-          emoji: data.emoji
-        };
+    socket.emit('room_joined', { room });
+  });
 
-        console.log(`Player ${data.name} joined room ${userRoomCode}`);
-        
-        // Notify the host about the new player
-        if (room.host && room.host.readyState === WebSocket.OPEN) {
-          room.host.send(JSON.stringify({
-            type: 'player_joined',
-            player: {
-              id: userPlayerId,
-              name: data.name,
-              color: data.color,
-              emoji: data.emoji
-            }
-          }));
-        }
-
-        ws.send(JSON.stringify({ type: 'joined', room: userRoomCode }));
-      }
-      else if (data.type === 'sync') {
-        // Broadcast game states/events to everyone in the room
-        const room = rooms[userRoomCode];
-        if (room) {
-          const payload = JSON.stringify(data);
-          
-          // Send to host
-          if (room.host && room.host !== ws && room.host.readyState === WebSocket.OPEN) {
-            room.host.send(payload);
-          }
-          
-          // Send to players
-          Object.values(room.players).forEach(p => {
-            if (p.ws && p.ws !== ws && p.ws.readyState === WebSocket.OPEN) {
-              p.ws.send(payload);
-            }
-          });
-        }
-      }
-    } catch(e) {
-      console.error(e);
+  // Sync game actions
+  socket.on('sync_action', (data) => {
+    if (socket.roomCode) {
+      // Send to all other clients in the room
+      socket.to(socket.roomCode).emit('sync_action', data);
     }
   });
 
-  ws.on('close', () => {
-    if (userRoomCode && rooms[userRoomCode]) {
-      const room = rooms[userRoomCode];
-      
-      if (room.host === ws) {
-        // If host disconnects, close room
-        console.log(`Host disconnected. Closing room ${userRoomCode}`);
-        Object.values(room.players).forEach(p => {
-          if (p.ws && p.ws.readyState === WebSocket.OPEN) {
-            p.ws.send(JSON.stringify({ type: 'error', message: 'Host disconnected. Room closed.' }));
-          }
-        });
-        delete rooms[userRoomCode];
-      } 
-      else if (userPlayerId && room.players[userPlayerId]) {
-        // If a player disconnects, notify host
-        console.log(`Player ${room.players[userPlayerId].name} disconnected from room ${userRoomCode}`);
-        delete room.players[userPlayerId];
-        if (room.host && room.host.readyState === WebSocket.OPEN) {
-          room.host.send(JSON.stringify({
-            type: 'player_left',
-            playerId: userPlayerId
-          }));
-        }
+  socket.on('disconnect', () => {
+    console.log(`User disconnected: ${socket.id}`);
+    const { roomCode, isHost, playerId, playerName } = socket;
+
+    if (roomCode) {
+      if (isHost) {
+        console.log(`Host left. Closing room: ${roomCode}`);
+        socket.to(roomCode).emit('room_closed', { message: 'Host disconnected. Room closed.' });
+      } else if (playerId) {
+        console.log(`Player ${playerName} left room: ${roomCode}`);
+        socket.to(roomCode).emit('player_left', { playerId });
       }
     }
   });
 });
 
-server.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+const PORT = process.env.PORT || 8080;
+server.listen(PORT, () => {
+  console.log(`Socket.io server running on port ${PORT}`);
 });
