@@ -1,7 +1,11 @@
 /* ============================================================
    Imposter Party — Web Edition  |  app.js
-   Complete game engine with settings, multi-round, hints
+   Complete game engine with settings, multi-round, hints, 
+   custom avatar selector, and real-time online same-room multiplayer.
    ============================================================ */
+
+// ── Realtime Signaling Settings ──────────────────────────────
+const WS_URL = 'wss://imposter-party-server.onrender.com';
 
 // ── Audio ────────────────────────────────────────────────────
 let audioCtx = null;
@@ -74,17 +78,6 @@ function settingStep(key, d) {
 }
 function toggleSetting(key) { S[key] = !S[key]; saveSettings(); }
 
-function toggleFullscreen() {
-  playSound('click');
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(err => {
-      notify('Error enabling fullscreen: ' + err.message);
-    });
-  } else {
-    document.exitFullscreen();
-  }
-}
-
 // ── Game State ────────────────────────────────────────────────
 const GS = {
   mode: 'classic',
@@ -102,9 +95,17 @@ const GS = {
   // custom packs
   customWords: [],
   customQuestions: [],
-  
+
   // avatar picker edit state
-  editingPlayerId: null
+  editingPlayerId: null,
+
+  // Online Multiplayer State
+  isOnline: false,
+  isHost: false,
+  roomCode: null,
+  socket: null,
+  myPlayerId: null,
+  joinerAvatar: { emoji: '🐱', color: '#8b5cf6' }
 };
 
 // ── Init ──────────────────────────────────────────────────────
@@ -130,6 +131,13 @@ function initApp() {
   renderPlayerList();
   renderCatGrid();
   showScreen('screen-home');
+
+  // Auto join room if in link query
+  const params = new URLSearchParams(window.location.search);
+  const room = params.get('room');
+  if (room) {
+    setTimeout(() => { openJoinModal(); }, 400);
+  }
 }
 
 // ── Screen switching ──────────────────────────────────────────
@@ -146,11 +154,352 @@ function notify(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(notifTimer);
-  notifTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  notifTimer = setTimeout(() => el.classList.remove('show'), 3500);
 }
 
-// ── Players ───────────────────────────────────────────────────
-function savePlayers() { localStorage.setItem('ig_players', JSON.stringify(GS.players)); }
+// ── Realtime Synchronization WebSockets ───────────────────────
+function initSocket(onConnect) {
+  if (GS.socket && GS.socket.readyState === WebSocket.OPEN) {
+    if (onConnect) onConnect();
+    return;
+  }
+  
+  notify('Connecting to server (waking up server tier)...');
+  GS.socket = new WebSocket(WS_URL);
+  
+  GS.socket.onopen = () => {
+    notify('Connected to lobby sync network! 🌐');
+    if (onConnect) onConnect();
+  };
+  
+  GS.socket.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      handleSocketMessage(data);
+    } catch(e) {}
+  };
+  
+  GS.socket.onclose = () => {
+    if (GS.isOnline) {
+      notify('Signal lost. Reconnecting to lobby...');
+      setTimeout(() => initSocket(), 3000);
+    }
+  };
+  
+  GS.socket.onerror = () => {
+    notify('Failed to connect to lobby server. Make sure server is hosted.');
+  };
+}
+
+function syncState(action, extraData = {}) {
+  if (GS.isOnline && GS.socket && GS.socket.readyState === WebSocket.OPEN) {
+    GS.socket.send(JSON.stringify({
+      type: 'sync',
+      room: GS.roomCode,
+      action: action,
+      ...extraData
+    }));
+  }
+}
+
+function handleSocketMessage(data) {
+  // Host events
+  if (data.type === 'hosted') {
+    document.getElementById('setup-online-indicator').style.display = 'flex';
+    document.getElementById('setup-room-code').textContent = GS.roomCode;
+    renderPlayerList();
+    showScreen('screen-setup');
+  } 
+  // Joiner events
+  else if (data.type === 'joined') {
+    closeModal('join-modal');
+    document.getElementById('lobby-code-val').textContent = GS.roomCode;
+    showScreen('screen-lobby');
+  }
+  // Host receiving player joiner info
+  else if (data.type === 'player_joined') {
+    if (GS.isHost) {
+      const p = data.player;
+      if (!GS.players.some(x => x.id === p.id)) {
+        GS.players.push({
+          id: p.id,
+          name: p.name,
+          color: p.color,
+          emoji: p.emoji,
+          isRemote: true
+        });
+        renderPlayerList();
+        playSound('click');
+        notify(`${p.name} joined the room!`);
+        syncLobbyToJoiners();
+      }
+    }
+  }
+  // Host receiving player quit
+  else if (data.type === 'player_left') {
+    if (GS.isHost) {
+      GS.players = GS.players.filter(x => x.id !== data.playerId);
+      renderPlayerList();
+      notify('A player left the room.');
+      syncLobbyToJoiners();
+    }
+  }
+  // Relay errors
+  else if (data.type === 'error') {
+    notify(data.message);
+    leaveLobby();
+  }
+  // State Sync event RELAYED by server
+  else if (data.type === 'sync') {
+    handleGameStateSync(data);
+  }
+}
+
+function handleGameStateSync(data) {
+  // Joiners receiving lobby player lists updates
+  if (data.action === 'lobby_update') {
+    if (!GS.isHost) {
+      GS.players = data.players;
+      updateLobbyJoinerList();
+    }
+  }
+  // Joiners starting reveal round
+  else if (data.action === 'start_game') {
+    GS.players = data.players;
+    GS.revealQueue = data.revealQueue.map(id => GS.players.find(x => x.id === id));
+    GS.revealIdx = 0;
+    GS.word = data.word;
+    GS.normalQ = data.normalQ;
+    GS.liarQ = data.liarQ;
+    GS.mode = data.mode;
+    GS.selectedCats = data.selectedCats;
+    GS.chosenCatName = data.chosenCatName;
+
+    // Reset flipped card state
+    const card = document.getElementById('reveal-card');
+    if (card) card.classList.remove('flipped');
+
+    showRevealIntro();
+  }
+  // Syncing reveal transitions
+  else if (data.action === 'reveal_next') {
+    GS.revealIdx = data.revealIdx;
+    
+    const card = document.getElementById('reveal-card');
+    if (card) card.classList.remove('flipped');
+    
+    if (GS.revealIdx < GS.revealQueue.length) {
+      showRevealIntro();
+    } else {
+      startDescribePhase();
+    }
+  }
+  // Syncing speak phase
+  else if (data.action === 'start_describe') {
+    GS.descQueue = data.descQueue.map(id => GS.players.find(x => x.id === id));
+    GS.descIdx = 0;
+    renderDescQueue();
+    setupDescriber();
+    showScreen('screen-describe');
+  }
+  // Syncing turn timers
+  else if (data.action === 'timer_toggle') {
+    GS.timerSecs = data.secs;
+    GS.timerActive = data.active;
+    const btn = document.getElementById('timer-btn');
+    const wrap = document.getElementById('timer-ring-wrap');
+    
+    if (GS.timerActive) {
+      btn.textContent = 'Pause';
+      btn.className = 'btn btn-secondary';
+      clearInterval(GS.timerHandle);
+      GS.timerHandle = setInterval(() => {
+        GS.timerSecs--;
+        drawTimer();
+        if (GS.timerSecs <= 0) {
+          clearInterval(GS.timerHandle); GS.timerActive = false;
+          playSound('gong'); btn.textContent = "Time's Up!"; btn.className = 'btn btn-accent';
+        }
+      }, 1000);
+    } else {
+      clearInterval(GS.timerHandle);
+      btn.textContent = 'Resume';
+      btn.className = 'btn btn-secondary';
+    }
+    drawTimer();
+  }
+  // Syncing describer turns
+  else if (data.action === 'describe_next') {
+    GS.descIdx = data.descIdx;
+    if (GS.descIdx < GS.descQueue.length) {
+      renderDescQueue();
+      setupDescriber();
+    } else {
+      startVotePhase();
+    }
+  }
+  // Syncing vote stage
+  else if (data.action === 'start_vote') {
+    startVotePhase();
+  }
+  // Syncing vote eliminations
+  else if (data.action === 'player_eliminated') {
+    const p = GS.players.find(x => x.id === data.playerId);
+    if (p) {
+      p.active = false;
+      playSound('gong');
+      const who = p.role === 'imposter'
+        ? (GS.mode === 'classic' ? 'the Imposter!' : 'the Liar!')
+        : (GS.mode === 'classic' ? `a Civilian (word: ${GS.word})` : 'a Normal Citizen');
+      notify(`${p.name} was ${who}`);
+      
+      // Local win condition checks are host only (host relays result)
+      if (GS.isHost) {
+        checkEnd();
+      }
+    }
+  }
+  // Joiner receiving guess input
+  else if (data.action === 'show_guess_screen') {
+    showGuessScreen();
+  }
+  // Host receiving imposter guess submission
+  else if (data.action === 'imposter_guess') {
+    if (GS.isHost) {
+      evaluateImposterGuess(data.guess);
+    }
+  }
+  // Syncing round game over
+  else if (data.action === 'game_over') {
+    endGame(data.winner);
+  }
+  // Replay
+  else if (data.action === 'reset_round') {
+    // Reset players back to alive state
+    GS.players.forEach(p => p.active = true);
+    if (GS.isHost) {
+      showScreen('screen-categories');
+    } else {
+      showScreen('screen-lobby');
+    }
+  }
+}
+
+// ── Host Room Action ──────────────────────────────────────────
+function hostOnlineRoom() {
+  GS.isOnline = true;
+  GS.isHost = true;
+  GS.players = []; // clear to let remote player connect
+  GS.roomCode = Math.floor(1000 + Math.random() * 9000).toString();
+  
+  initSocket(() => {
+    GS.socket.send(JSON.stringify({ type: 'host', room: GS.roomCode }));
+  });
+}
+
+function syncLobbyToJoiners() {
+  syncState('lobby_update', { players: GS.players });
+}
+
+function updateLobbyJoinerList() {
+  const list = document.getElementById('lobby-players-list');
+  if (!list) return;
+  list.innerHTML = '';
+  GS.players.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'player-tag';
+    el.innerHTML = `<div class="player-info-tag">
+      <div class="player-avatar-dot" style="background:${p.color}">${p.emoji}</div>
+      <span style="font-weight:600; font-size:0.95rem; padding:4px 6px;">${esc(p.name)}</span>
+    </div>`;
+    list.appendChild(el);
+  });
+}
+
+// ── Join Room Modal Actions ───────────────────────────────────
+function openJoinModal() {
+  playSound('click');
+  const params = new URLSearchParams(window.location.search);
+  const r = params.get('room');
+  if (r) document.getElementById('join-room-input').value = r;
+
+  const preview = document.getElementById('join-avatar-preview');
+  preview.textContent = GS.joinerAvatar.emoji;
+  preview.style.backgroundColor = GS.joinerAvatar.color;
+  
+  document.getElementById('join-modal').classList.add('active');
+}
+
+function openJoinAvatarPicker() {
+  playSound('click');
+  GS.editingPlayerId = 'joiner';
+  renderAvatarPickerGrids(GS.joinerAvatar.emoji, GS.joinerAvatar.color);
+  document.getElementById('avatar-modal').classList.add('active');
+}
+
+function submitJoinRoom() {
+  const roomInp = document.getElementById('join-room-input');
+  const nameInp = document.getElementById('join-name-input');
+  const room = (roomInp.value || '').trim();
+  const name = (nameInp.value || '').trim();
+  
+  if (!room || !name) { notify('Fill in all fields!'); return; }
+  playSound('click');
+  
+  GS.isOnline = true;
+  GS.isHost = false;
+  GS.roomCode = room;
+  GS.myPlayerId = Date.now();
+  
+  initSocket(() => {
+    GS.socket.send(JSON.stringify({
+      type: 'join',
+      room: room,
+      playerId: GS.myPlayerId,
+      name: name,
+      emoji: GS.joinerAvatar.emoji,
+      color: GS.joinerAvatar.color
+    }));
+  });
+}
+
+function leaveLobby() {
+  playSound('click');
+  if (GS.socket) {
+    GS.socket.close();
+  }
+  GS.isOnline = false;
+  GS.isHost = false;
+  GS.roomCode = null;
+  GS.socket = null;
+  GS.myPlayerId = null;
+  
+  // hide indicators
+  document.getElementById('setup-online-indicator').style.display = 'none';
+  
+  // Reload local players
+  const sp = localStorage.getItem('ig_players');
+  if (sp) GS.players = JSON.parse(sp);
+  renderPlayerList();
+  showScreen('screen-home');
+}
+
+function copyRoomLink() {
+  playSound('click');
+  const url = `${window.location.origin}${window.location.pathname}?room=${GS.roomCode}`;
+  navigator.clipboard.writeText(url).then(() => {
+    notify('Room link copied to clipboard!');
+  }).catch(() => {
+    notify(`Code: ${GS.roomCode}`);
+  });
+}
+
+// ── Players list management ───────────────────────────────────
+function savePlayers() { 
+  if (!GS.isOnline) {
+    localStorage.setItem('ig_players', JSON.stringify(GS.players)); 
+  }
+}
 
 function renderPlayerList() {
   const ul = document.getElementById('players-list');
@@ -163,13 +512,20 @@ function renderPlayerList() {
   GS.players.forEach(p => {
     const li = document.createElement('div');
     li.className = 'player-tag';
+    
+    // Disable edit inline name for remote players to avoid collision
+    const inlineEditAttr = p.isRemote ? 'disabled style="pointer-events:none;"' : '';
+    const avatarCursor = p.isRemote ? '' : 'cursor: pointer;';
+    const avatarTitle = p.isRemote ? '' : 'title="Edit Icon"';
+    const avatarClick = p.isRemote ? '' : `onclick="openAvatarPicker(${p.id})"`;
+
     li.innerHTML = `
       <div class="player-info-tag">
-        <div class="player-avatar-dot" style="background:${p.color}; cursor: pointer;" 
-             onclick="openAvatarPicker(${p.id})" title="Edit Icon">${p.emoji}</div>
+        <div class="player-avatar-dot" style="background:${p.color}; ${avatarCursor}" 
+             ${avatarClick} ${avatarTitle}>${p.emoji}</div>
         <input type="text" class="player-name-input" value="${esc(p.name)}" 
                onchange="renamePlayer(${p.id}, this.value)" 
-               onkeydown="if(event.key==='Enter') this.blur()">
+               onkeydown="if(event.key==='Enter') this.blur()" ${inlineEditAttr}>
       </div>
       <button class="remove-player-btn" onclick="removePlayer(${p.id})">✕</button>`;
     ul.appendChild(li);
@@ -210,23 +566,39 @@ function renderAvatarPickerGrids(activeEmoji, activeColor) {
 
 function selectPickerEmoji(em) {
   playSound('click');
-  const p = GS.players.find(x => x.id === GS.editingPlayerId);
-  if (p) {
-    p.emoji = em;
-    savePlayers();
-    renderPlayerList();
-    renderAvatarPickerGrids(p.emoji, p.color);
+  if (GS.editingPlayerId === 'joiner') {
+    GS.joinerAvatar.emoji = em;
+    const preview = document.getElementById('join-avatar-preview');
+    if (preview) preview.textContent = em;
+    renderAvatarPickerGrids(em, GS.joinerAvatar.color);
+  } else {
+    const p = GS.players.find(x => x.id === GS.editingPlayerId);
+    if (p) {
+      p.emoji = em;
+      savePlayers();
+      renderPlayerList();
+      renderAvatarPickerGrids(p.emoji, p.color);
+      if (GS.isHost) syncLobbyToJoiners();
+    }
   }
 }
 
 function selectPickerColor(col) {
   playSound('click');
-  const p = GS.players.find(x => x.id === GS.editingPlayerId);
-  if (p) {
-    p.color = col;
-    savePlayers();
-    renderPlayerList();
-    renderAvatarPickerGrids(p.emoji, p.color);
+  if (GS.editingPlayerId === 'joiner') {
+    GS.joinerAvatar.color = col;
+    const preview = document.getElementById('join-avatar-preview');
+    if (preview) preview.style.backgroundColor = col;
+    renderAvatarPickerGrids(GS.joinerAvatar.emoji, col);
+  } else {
+    const p = GS.players.find(x => x.id === GS.editingPlayerId);
+    if (p) {
+      p.color = col;
+      savePlayers();
+      renderPlayerList();
+      renderAvatarPickerGrids(p.emoji, p.color);
+      if (GS.isHost) syncLobbyToJoiners();
+    }
   }
 }
 
@@ -248,12 +620,20 @@ function addPlayer() {
   GS.players.push({ id: Date.now(), name, color: COLORS[i], emoji: EMOJIS[i] });
   savePlayers(); renderPlayerList();
   inp.value = ''; inp.focus();
+  
+  if (GS.isOnline && GS.isHost) {
+    syncLobbyToJoiners();
+  }
 }
 
 function removePlayer(id) {
   playSound('click');
   GS.players = GS.players.filter(p => p.id !== id);
   savePlayers(); renderPlayerList();
+  
+  if (GS.isOnline && GS.isHost) {
+    syncLobbyToJoiners();
+  }
 }
 
 function clearAllPlayers() {
@@ -261,6 +641,10 @@ function clearAllPlayers() {
   GS.players = [];
   savePlayers(); renderPlayerList();
   notify('All players cleared!');
+  
+  if (GS.isOnline && GS.isHost) {
+    syncLobbyToJoiners();
+  }
 }
 
 function renamePlayer(id, newName) {
@@ -269,7 +653,6 @@ function renamePlayer(id, newName) {
     renderPlayerList();
     return;
   }
-  // Check duplicates excluding self
   if (GS.players.some(p => p.id !== id && p.name.toLowerCase() === name.toLowerCase())) {
     notify('That name is already taken!');
     renderPlayerList();
@@ -279,6 +662,7 @@ function renamePlayer(id, newName) {
   if (p) {
     p.name = name;
     savePlayers();
+    if (GS.isOnline && GS.isHost) syncLobbyToJoiners();
   }
 }
 
@@ -293,7 +677,7 @@ function setGameMode(mode) {
   GS.mode = mode;
   GS.selectedCats = [];
   renderCatGrid();
-  // show / hide custom inputs
+  
   const isClassic = mode === 'classic';
   document.getElementById('custom-word-entry').style.display     = isClassic ? 'flex' : 'none';
   document.getElementById('custom-question-entry').style.display = isClassic ? 'none' : 'flex';
@@ -319,7 +703,7 @@ function renderCatGrid() {
       <span class="cat-count">${cnt} words</span>`;
     grid.appendChild(card);
   });
-  // custom
+  
   const customCnt = GS.mode === 'classic' ? GS.customWords.length : GS.customQuestions.length;
   const cc = document.createElement('div');
   cc.className = 'category-card' + (GS.selectedCats.includes('custom') ? ' selected' : '');
@@ -472,11 +856,26 @@ function startGame() {
   const card = document.getElementById('reveal-card');
   if (card) card.classList.remove('flipped');
 
+  if (GS.isOnline && GS.isHost) {
+    syncState('start_game', {
+      players: GS.players,
+      revealQueue: GS.revealQueue.map(p => p.id),
+      word: GS.word,
+      normalQ: GS.normalQ,
+      liarQ: GS.liarQ,
+      mode: GS.mode,
+      selectedCats: GS.selectedCats,
+      chosenCatName: GS.chosenCatName
+    });
+  }
+
   showRevealIntro();
 }
 
-// alias for "Play Again" (same category)
-function playAgain() { startGame(); }
+function playAgain() { 
+  if (GS.isOnline && !GS.isHost) return;
+  startGame(); 
+}
 
 // ── Reveal phase ──────────────────────────────────────────────
 function showRevealIntro() {
@@ -485,6 +884,26 @@ function showRevealIntro() {
   setStyle('ri-avatar', 'background', p.color);
   setEl('ri-name', p.name);
   setEl('ri-progress', `${GS.revealIdx+1} of ${GS.revealQueue.length}`);
+  
+  // Online mode reveal state
+  if (GS.isOnline) {
+    const isMe = (!GS.isHost && p.id === GS.myPlayerId) || (GS.isHost && !p.isRemote);
+    if (!isMe) {
+      document.getElementById('ri-pass-label').textContent = 'REVEAL STAGE';
+      document.getElementById('ri-privacy-lbl').style.display = 'none';
+      document.getElementById('ri-ready-btn').style.display = 'none';
+      document.getElementById('ri-waiting-wrap').style.display = 'block';
+      document.getElementById('ri-waiting-label').textContent = `Waiting for ${p.name} to view their role…`;
+      showScreen('screen-reveal-intro');
+      return;
+    }
+  }
+
+  // Local/Active reveal state
+  document.getElementById('ri-pass-label').textContent = 'PASS THE DEVICE TO';
+  document.getElementById('ri-privacy-lbl').style.display = 'block';
+  document.getElementById('ri-ready-btn').style.display = 'block';
+  document.getElementById('ri-waiting-wrap').style.display = 'none';
   showScreen('screen-reveal-intro');
 }
 
@@ -544,11 +963,17 @@ function flipCard() {
 function nextReveal() {
   playSound('click');
   
-  // Unflip the card immediately so it is ready for the next player / round without any visual transitions
+  // Unflip the card immediately
   const card = document.getElementById('reveal-card');
   if (card) card.classList.remove('flipped');
 
   GS.revealIdx++;
+  
+  if (GS.isOnline) {
+    // Sync the reveal screen progress to peers
+    syncState('reveal_next', { revealIdx: GS.revealIdx });
+  }
+
   if (GS.revealIdx < GS.revealQueue.length) {
     showRevealIntro();
   } else {
@@ -558,22 +983,44 @@ function nextReveal() {
 
 // ── Describe phase ────────────────────────────────────────────
 function startDescribePhase() {
-  GS.descQueue = shuffle([...GS.players.filter(p=>p.active)]);
-  
-  if (S.imposterGoesLast && GS.descQueue.length > 1) {
-    if (GS.descQueue[0].role === 'imposter') {
-      const civIdx = GS.descQueue.findIndex(p => p.role !== 'imposter');
-      if (civIdx > -1) {
-        // Swap so imposter doesn't go first
-        [GS.descQueue[0], GS.descQueue[civIdx]] = [GS.descQueue[civIdx], GS.descQueue[0]];
+  if (GS.isOnline) {
+    // Only host randomizes speak order and syncs it
+    if (GS.isHost) {
+      GS.descQueue = shuffle([...GS.players.filter(p=>p.active)]);
+      
+      // Imposter never goes first setting
+      if (S.imposterGoesLast && GS.descQueue.length > 1) {
+        if (GS.descQueue[0].role === 'imposter') {
+          const civIdx = GS.descQueue.findIndex(p => p.role !== 'imposter');
+          if (civIdx > -1) {
+            [GS.descQueue[0], GS.descQueue[civIdx]] = [GS.descQueue[civIdx], GS.descQueue[0]];
+          }
+        }
+      }
+      
+      GS.descIdx = 0;
+      syncState('start_describe', { descQueue: GS.descQueue.map(p => p.id) });
+      
+      renderDescQueue();
+      setupDescriber();
+      showScreen('screen-describe');
+    }
+  } else {
+    // Local flow
+    GS.descQueue = shuffle([...GS.players.filter(p=>p.active)]);
+    if (S.imposterGoesLast && GS.descQueue.length > 1) {
+      if (GS.descQueue[0].role === 'imposter') {
+        const civIdx = GS.descQueue.findIndex(p => p.role !== 'imposter');
+        if (civIdx > -1) {
+          [GS.descQueue[0], GS.descQueue[civIdx]] = [GS.descQueue[civIdx], GS.descQueue[0]];
+        }
       }
     }
+    GS.descIdx = 0;
+    renderDescQueue();
+    setupDescriber();
+    showScreen('screen-describe');
   }
-
-  GS.descIdx   = 0;
-  renderDescQueue();
-  setupDescriber();
-  showScreen('screen-describe');
 }
 
 function renderDescQueue() {
@@ -596,6 +1043,24 @@ function setupDescriber() {
   setStyle('desc-avatar','background', p.color);
   setEl('desc-name', p.name);
   setEl('desc-progress', `${GS.descIdx+1} / ${GS.descQueue.length}`);
+  
+  // In Online mode, only the speaking player (or Host) can tap next / start timer
+  const isMe = (!GS.isHost && p.id === GS.myPlayerId) || (GS.isHost && !p.isRemote);
+  const nextBtn = document.querySelector('.screen-describe .btn-cyan');
+  
+  if (GS.isOnline) {
+    if (isMe || GS.isHost) {
+      document.getElementById('timer-btn').style.display = 'block';
+      if (nextBtn) nextBtn.style.display = 'block';
+    } else {
+      document.getElementById('timer-btn').style.display = 'none';
+      if (nextBtn) nextBtn.style.display = 'none';
+    }
+  } else {
+    document.getElementById('timer-btn').style.display = 'block';
+    if (nextBtn) nextBtn.style.display = 'block';
+  }
+
   resetTimer();
 }
 
@@ -622,6 +1087,7 @@ function toggleTimer() {
   playSound('click');
   const btn  = document.getElementById('timer-btn');
   const wrap = document.getElementById('timer-ring-wrap');
+  
   if (GS.timerActive) {
     clearInterval(GS.timerHandle);
     GS.timerActive = false;
@@ -635,10 +1101,14 @@ function toggleTimer() {
       const threshold = Math.ceil(S.timerDuration * 0.25);
       if (GS.timerSecs <= threshold) { playSound('tick'); wrap.classList.add('warning'); }
       if (GS.timerSecs <= 0) {
-        clearInterval(GS.timerHandle); GS.timerActive=false;
+        clearInterval(GS.timerHandle); GS.timerActive = false;
         playSound('gong'); btn.textContent="Time's Up!"; btn.className='btn btn-accent';
       }
     }, 1000);
+  }
+
+  if (GS.isOnline) {
+    syncState('timer_toggle', { active: GS.timerActive, secs: GS.timerSecs });
   }
 }
 
@@ -646,15 +1116,25 @@ function nextDescriber() {
   playSound('click');
   clearInterval(GS.timerHandle);
   GS.descIdx++;
+
+  if (GS.isOnline) {
+    syncState('describe_next', { descIdx: GS.descIdx });
+  }
+
   if (GS.descIdx < GS.descQueue.length) {
     renderDescQueue(); setupDescriber();
   } else {
-    startVotePhase();
+    if (!GS.isOnline || GS.isHost) {
+      startVotePhase();
+    }
   }
 }
 
 // ── Vote phase ────────────────────────────────────────────────
 function startVotePhase() {
+  if (GS.isOnline && GS.isHost) {
+    syncState('start_vote');
+  }
   renderVoteGrid();
   showScreen('screen-vote');
 }
@@ -662,13 +1142,19 @@ function startVotePhase() {
 function renderVoteGrid() {
   const g = document.getElementById('vote-grid');
   g.innerHTML = '';
+  
+  const isVoter = !GS.isOnline || GS.isHost; // host acts as moderator / handles eliminate input
+
   GS.players.forEach(p => {
     const card = document.createElement('div');
     card.className = 'vote-card' + (p.active?'':' eliminated');
     card.innerHTML = `<div class="vote-av" style="background:${p.color}">${p.emoji}</div>
       <span class="vote-nm">${esc(p.name)}</span>
       ${!p.active?'<span class="elim-badge">Out</span>':''}`;
-    if (p.active) card.onclick = () => confirmVote(p);
+    
+    if (p.active && isVoter) {
+      card.onclick = () => confirmVote(p);
+    }
     g.appendChild(card);
   });
 }
@@ -690,10 +1176,16 @@ function doEliminate() {
   p.active = false;
   closeModal('vote-confirm-modal');
   playSound('gong');
+  
+  if (GS.isOnline && GS.isHost) {
+    syncState('player_eliminated', { playerId: p.id });
+  }
+
   const who = p.role==='imposter'
     ? (GS.mode==='classic' ? 'the Imposter!' : 'the Liar!')
     : (GS.mode==='classic' ? `a Civilian (word: ${GS.word})` : 'a Normal Citizen');
   notify(`${p.name} was ${who}`);
+  
   checkEnd();
 }
 
@@ -703,37 +1195,93 @@ function checkEnd() {
   const civs    = active.filter(p=>p.role==='civilian');
 
   if (imps.length === 0) {
-    GS.mode==='classic' ? showGuessScreen() : endGame('civilians');
+    if (GS.mode === 'classic') {
+      if (GS.isOnline) {
+        syncState('show_guess_screen');
+      }
+      showGuessScreen();
+    } else {
+      triggerGameOver('civilians');
+    }
     return;
   }
-  if (imps.length >= civs.length) { endGame('imposters'); return; }
+  if (imps.length >= civs.length) { 
+    triggerGameOver('imposters'); 
+    return; 
+  }
 
   // continue
+  if (GS.isOnline && GS.isHost) {
+    syncState('start_vote');
+  }
   renderVoteGrid();
-  setTimeout(() => startDescribePhase(), 1200);
+  setTimeout(() => startDescribePhase(), 1500);
 }
 
 // ── Imposter guess ────────────────────────────────────────────
 function showGuessScreen() {
   document.getElementById('guess-input').value = '';
   const elim = GS.players.filter(p=>!p.active && p.role==='imposter');
-  setEl('guesser-name', elim.length ? elim[elim.length-1].name : 'The Imposter');
+  const name = elim.length ? elim[elim.length-1].name : 'The Imposter';
+  setEl('guesser-name', name);
+  
+  // Disable submission if this player is NOT the imposter (in online mode)
+  const isMe = GS.players.some(p => p.id === GS.myPlayerId && p.role === 'imposter');
+  const subBtn = document.querySelector('.guess-card .btn-accent');
+  const guessInp = document.getElementById('guess-input');
+  
+  if (GS.isOnline) {
+    if (isMe) {
+      if(subBtn) subBtn.style.display = 'block';
+      if(guessInp) guessInp.removeAttribute('disabled');
+    } else {
+      if(subBtn) subBtn.style.display = 'none';
+      if(guessInp) {
+        guessInp.setAttribute('disabled', 'true');
+        guessInp.placeholder = `Waiting for ${name} to guess…`;
+      }
+    }
+  } else {
+    if(subBtn) subBtn.style.display = 'block';
+    if(guessInp) {
+      guessInp.removeAttribute('disabled');
+      guessInp.placeholder = 'Type your guess…';
+    }
+  }
+
   showScreen('screen-guess');
 }
 
 function submitGuess() {
   const g = (document.getElementById('guess-input').value||'').trim().toLowerCase();
-  const a = GS.word.toLowerCase();
   if (!g) { notify('Type a guess!'); return; }
   playSound('click');
-  const correct = g === a || (a.includes(g) && g.length > 2);
+
+  if (GS.isOnline) {
+    syncState('imposter_guess', { guess: g });
+  } else {
+    evaluateImposterGuess(g);
+  }
+}
+
+function evaluateImposterGuess(guess) {
+  const a = GS.word.toLowerCase();
+  const correct = guess === a || (a.includes(guess) && guess.length > 2);
+  
   if (correct) {
     playSound('fail'); notify(`Correct! The word was "${GS.word}". Imposter steals the win!`);
-    endGame('imposters');
+    triggerGameOver('imposters');
   } else {
     playSound('win'); notify(`Wrong! The word was "${GS.word}". Civilians win!`);
-    endGame('civilians');
+    triggerGameOver('civilians');
   }
+}
+
+function triggerGameOver(winner) {
+  if (GS.isOnline && GS.isHost) {
+    syncState('game_over', { winner: winner });
+  }
+  endGame(winner);
 }
 
 // ── Game over ─────────────────────────────────────────────────
@@ -783,6 +1331,27 @@ function endGame(winner) {
       <span class="summary-role-tag ${tag}">${role}</span>`;
     ul.appendChild(li);
   });
+
+  // Online mode: only host can play again or change category
+  const playAgainBtn = document.querySelector('.go-btns button:first-child');
+  const changeCatBtn = document.querySelector('.go-btns button:nth-child(2)');
+  const mainMenuBtn = document.querySelector('.go-btns button:last-child');
+  
+  if (GS.isOnline) {
+    if (GS.isHost) {
+      if (playAgainBtn) playAgainBtn.style.display = 'block';
+      if (changeCatBtn) changeCatBtn.style.display = 'block';
+      if (mainMenuBtn) mainMenuBtn.textContent = '🏠 Close Room & Exit';
+    } else {
+      if (playAgainBtn) playAgainBtn.style.display = 'none';
+      if (changeCatBtn) changeCatBtn.style.display = 'none';
+      if (mainMenuBtn) mainMenuBtn.textContent = '🏠 Leave Lobby';
+    }
+  } else {
+    if (playAgainBtn) playAgainBtn.style.display = 'block';
+    if (changeCatBtn) changeCatBtn.style.display = 'block';
+    if (mainMenuBtn) mainMenuBtn.textContent = '🏠 Main Menu';
+  }
 
   showScreen('screen-gameover');
 }

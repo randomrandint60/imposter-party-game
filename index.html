@@ -30,7 +30,17 @@
   <!-- ── Screen: Home ────────────────────────────────────── -->
   <div id="screen-home" class="screen">
     <header class="game-header">
-      <div class="logo-shield">🕵️</div>
+      <div class="logo-shield">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:48px; height:48px;">
+          <!-- Detective Fedora Hat -->
+          <path d="M12 36C12 28 20 26 32 26S52 28 52 36" stroke="currentColor" fill="none" />
+          <path d="M8 40h48" stroke="currentColor" />
+          <rect x="22" y="32" width="20" height="8" rx="2" fill="currentColor" opacity="0.3" />
+          <!-- Magnifying Glass -->
+          <circle cx="38" cy="42" r="8" stroke="var(--cyan)" stroke-width="3" fill="var(--bg)" />
+          <path d="M44 48l8 8" stroke="var(--cyan)" stroke-width="4" />
+        </svg>
+      </div>
       <h1 class="app-title">IMPOSTER</h1>
       <p class="app-sub">PARTY GAME</p>
       <button class="icon-btn settings-fab" onclick="openSettings()" title="Settings">⚙️</button>
@@ -55,6 +65,17 @@
       </div>
     </div>
 
+    <!-- Online game section -->
+    <div class="online-section glass-panel">
+      <h3 style="font-size:1.15rem; font-weight:700; margin-bottom: 6px;">🌐 Online Play</h3>
+      <p class="desc-text" style="margin-bottom: 12px; font-size:0.8rem">Play with friends on multiple devices in the same room.</p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-secondary btn-full" style="font-size:0.85rem; padding: 12px 14px;" onclick="hostOnlineRoom()">Host Room</button>
+        <button class="btn btn-secondary btn-full" style="font-size:0.85rem; padding: 12px 14px;" onclick="openJoinModal()">Join Room</button>
+      </div>
+      <p class="online-note" style="font-size: 0.72rem; color: var(--text-muted); text-align: center; margin-top: 8px;">Only for people in the same room to play on their devices.</p>
+    </div>
+
     <div class="home-footer">
       <button class="btn btn-ghost" onclick="toggleRules()">📖 How to Play</button>
     </div>
@@ -66,6 +87,12 @@
       <button class="back-btn" onclick="playSound('click'); showScreen('screen-home')">‹</button>
       <h2 class="topbar-title">Setup</h2>
       <button class="icon-btn" onclick="openSettings()">⚙️</button>
+    </div>
+
+    <!-- Online indicator -->
+    <div id="setup-online-indicator" class="glass-panel" style="display:none; padding:12px 18px; margin-bottom:14px; flex-direction:row; justify-content:space-between; align-items:center;">
+      <span style="font-size:0.88rem; font-weight:700; color:var(--cyan)">🌐 Room: <strong id="setup-room-code">—</strong></span>
+      <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.75rem; border-radius:8px;" onclick="copyRoomLink()">Copy Link</button>
     </div>
 
     <!-- Player management -->
@@ -140,12 +167,17 @@
   <!-- ── Screen: Reveal Intro ─────────────────────────────── -->
   <div id="screen-reveal-intro" class="screen screen-center">
     <div class="pass-device-card">
-      <p class="pass-label">PASS THE DEVICE TO</p>
+      <p id="ri-pass-label" class="pass-label">PASS THE DEVICE TO</p>
       <div id="ri-avatar" class="pass-avatar"></div>
       <h2 id="ri-name" class="pass-name">—</h2>
-      <p class="pass-privacy">👁️ Keep your role secret!</p>
+      <p id="ri-privacy-lbl" class="pass-privacy">👁️ Keep your role secret!</p>
+      
+      <div id="ri-waiting-wrap" style="display:none; margin: 10px 0 20px;">
+        <p id="ri-waiting-label" style="font-size:0.88rem; color:var(--cyan); font-weight:600; line-height:1.4; animation:pulse-glow 2s infinite ease-in-out;">Waiting for player to reveal role…</p>
+      </div>
+
       <p id="ri-progress" class="pass-progress">1 of 4</p>
-      <button class="btn btn-primary btn-wide" onclick="tapReveal()">I'm Ready — Show My Role</button>
+      <button id="ri-ready-btn" class="btn btn-primary btn-wide" onclick="tapReveal()">I'm Ready — Show My Role</button>
     </div>
   </div>
 
@@ -240,6 +272,21 @@
       <button class="btn btn-primary btn-full" onclick="playAgain()">▶ Play Again (Same Category)</button>
       <button class="btn btn-secondary btn-full" onclick="goToCategories()">🎲 Change Category</button>
       <button class="btn btn-ghost btn-full" onclick="playSound('click'); showScreen('screen-home')">🏠 Main Menu</button>
+    </div>
+  <!-- ── Screen: Lobby (Online Joiner View) ───────────────── -->
+  <div id="screen-lobby" class="screen screen-center">
+    <div class="lobby-card glass-panel" style="width:100%; max-width:340px; text-align:center; padding:30px 20px;">
+      <div class="logo-shield" style="width: 60px; height: 60px; font-size: 1.8rem; margin: 0 auto 16px;">🌐</div>
+      <h2 style="font-size:1.4rem; font-weight:800; margin-bottom:8px;">Online Lobby</h2>
+      <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:14px;">Room Code: <strong id="lobby-code-val" style="color:var(--cyan); font-size:1.1rem;">—</strong></p>
+      
+      <div class="lobby-players-box" style="background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.03); border-radius:16px; padding:14px; margin-bottom:20px; text-align:left;">
+        <span class="section-title" style="font-size:0.75rem; display:block; margin-bottom:8px;">Joined Players</span>
+        <div id="lobby-players-list" class="players-list" style="max-height:160px;"></div>
+      </div>
+      
+      <p style="font-size:0.85rem; color:var(--cyan); font-weight:600; animation:pulse-glow 2s infinite ease-in-out;">⏳ Waiting for host to start the game…</p>
+      <button class="btn btn-secondary btn-full" onclick="leaveLobby()" style="margin-top:20px; font-size:0.85rem; padding:10px 14px;">Leave Lobby</button>
     </div>
   </div>
 
@@ -342,6 +389,27 @@
     <div class="picker-section" style="margin-top: 20px;">
       <span class="section-title" style="font-size:0.8rem; margin-bottom: 10px; display:block;">Choose Color</span>
       <div id="picker-colors-grid" class="picker-col-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Join Room Modal -->
+<div id="join-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width: 360px;">
+    <div class="modal-header-row">
+      <h3 class="modal-title">🔑 Join Online Room</h3>
+      <button class="icon-btn" onclick="closeModal('join-modal')">✕</button>
+    </div>
+    <div class="join-fields" style="display:flex; flex-direction:column; gap:12px;">
+      <input id="join-room-input" type="text" placeholder="Enter 4-Digit Room Code" maxlength="4" style="text-align: center; font-size: 1.25rem; font-weight: 700; border: 1px solid var(--panel-border); border-radius: 12px; padding: 10px; width: 100%; color: var(--text); background: rgba(255,255,255,0.03);">
+      <input id="join-name-input" type="text" placeholder="Enter Your Name" maxlength="15" style="border: 1px solid var(--panel-border); border-radius: 12px; padding: 10px; width: 100%; color: var(--text); background: rgba(255,255,255,0.03);">
+      
+      <div class="join-avatar-select" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 4px;">
+        <span class="section-title" style="font-size:0.8rem; text-transform:none;">Tap bubble to customize avatar</span>
+        <div id="join-avatar-preview" class="player-avatar-dot" style="background: var(--purple); cursor: pointer; width: 38px; height: 38px; box-shadow: 0 0 10px rgba(255,255,255,0.15);" onclick="openJoinAvatarPicker()">🐱</div>
+      </div>
+      
+      <button class="btn btn-primary btn-full" style="padding: 12px 14px;" onclick="submitJoinRoom()">Join Room</button>
     </div>
   </div>
 </div>
