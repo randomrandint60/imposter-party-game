@@ -476,9 +476,21 @@ input {
   justify-content: center;
   font-size: 0.9rem;
 }
-.player-name-lbl {
+.player-name-input {
   font-size: 0.95rem;
   font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 150px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.player-name-input:focus {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1px var(--purple);
 }
 .remove-player-btn {
   cursor: pointer;

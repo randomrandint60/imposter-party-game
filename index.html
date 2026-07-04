@@ -72,7 +72,10 @@
     <div class="glass-panel">
       <div class="section-header">
         <span class="section-title">Players</span>
-        <span id="player-count" class="badge">4 / 12</span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn-link" style="margin-top: 0; font-size: 0.78rem; text-decoration: none; color: var(--magenta)" onclick="clearAllPlayers()">Clear All</button>
+          <span id="player-count" class="badge">4 / 12</span>
+        </div>
       </div>
 
       <div class="add-player-row">

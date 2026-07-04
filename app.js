@@ -146,7 +146,9 @@ function renderPlayerList() {
     li.innerHTML = `
       <div class="player-info-tag">
         <div class="player-avatar-dot" style="background:${p.color}">${p.emoji}</div>
-        <span class="player-name-lbl">${esc(p.name)}</span>
+        <input type="text" class="player-name-input" value="${esc(p.name)}" 
+               onchange="renamePlayer(${p.id}, this.value)" 
+               onkeydown="if(event.key==='Enter') this.blur()">
       </div>
       <button class="remove-player-btn" onclick="removePlayer(${p.id})">✕</button>`;
     ul.appendChild(li);
@@ -175,10 +177,35 @@ function addPlayer() {
 }
 
 function removePlayer(id) {
-  if (GS.players.length <= 3) { notify('Need at least 3 players!'); return; }
   playSound('click');
   GS.players = GS.players.filter(p => p.id !== id);
   savePlayers(); renderPlayerList();
+}
+
+function clearAllPlayers() {
+  playSound('gong');
+  GS.players = [];
+  savePlayers(); renderPlayerList();
+  notify('All players cleared!');
+}
+
+function renamePlayer(id, newName) {
+  const name = newName.trim();
+  if (!name) {
+    renderPlayerList();
+    return;
+  }
+  // Check duplicates excluding self
+  if (GS.players.some(p => p.id !== id && p.name.toLowerCase() === name.toLowerCase())) {
+    notify('That name is already taken!');
+    renderPlayerList();
+    return;
+  }
+  const p = GS.players.find(x => x.id === id);
+  if (p) {
+    p.name = name;
+    savePlayers();
+  }
 }
 
 function shake(el) {
@@ -239,6 +266,10 @@ function selectCat(key) {
 }
 
 function goToCategories() {
+  if (GS.players.length < 3) {
+    notify('You need at least 3 players to start!');
+    return;
+  }
   playSound('click');
   renderCatGrid();
   showScreen('screen-categories');
