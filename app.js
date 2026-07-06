@@ -809,7 +809,7 @@ function renderCatGrid() {
     card.onclick = () => selectCat(key);
     card.innerHTML = `<span class="cat-emoji">${cat.icon}</span>
       <span class="cat-name">${cat.name}</span>
-      <span class="cat-count">${cnt} words</span>`;
+      <span class="cat-count">${cnt} ${GS.mode === 'classic' ? 'words' : 'pairs'}</span>`;
     grid.appendChild(card);
   });
   
@@ -820,7 +820,7 @@ function renderCatGrid() {
   cc.onclick = () => selectCat('custom');
   cc.innerHTML = `<span class="cat-emoji">✨</span>
     <span class="cat-name">Custom</span>
-    <span class="cat-count">${customCnt} words</span>`;
+    <span class="cat-count">${customCnt} ${GS.mode === 'classic' ? 'words' : 'pairs'}</span>`;
   grid.appendChild(cc);
 }
 
