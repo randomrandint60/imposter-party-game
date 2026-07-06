@@ -49,7 +49,7 @@ const PICKER_EMOJIS = [
 ];
 
 // ── Settings ──────────────────────────────────────────────────
-const DEF_SETTINGS = { imposterCount:1, imposterGoesLast:false, imposterHint:false, timerDuration:30 };
+const DEF_SETTINGS = { imposterCount:1, randomImposterCount:false, imposterGoesLast:false, imposterHint:false, timerDuration:30 };
 let S = { ...DEF_SETTINGS };
 
 function loadSettings() {
@@ -64,12 +64,19 @@ function openSettings() {
   document.getElementById('si-timer').textContent  = S.timerDuration + 's';
   document.getElementById('si-last').checked  = S.imposterGoesLast;
   document.getElementById('si-hint').checked  = S.imposterHint;
+  
+  const randToggle = document.getElementById('si-random-count');
+  if (randToggle) {
+    randToggle.checked = S.randomImposterCount;
+    document.getElementById('setting-count-row').style.display = S.randomImposterCount ? 'none' : 'flex';
+  }
+  
   document.getElementById('settings-modal').classList.add('active');
 }
 function settingStep(key, d) {
   playSound('click');
   if (key === 'count') {
-    S.imposterCount = Math.max(1, Math.min(3, S.imposterCount + d));
+    S.imposterCount = Math.max(1, Math.min(11, S.imposterCount + d));
     document.getElementById('si-count').textContent = S.imposterCount;
   } else {
     S.timerDuration = Math.max(15, Math.min(90, S.timerDuration + d));
@@ -77,7 +84,14 @@ function settingStep(key, d) {
   }
   saveSettings();
 }
-function toggleSetting(key) { S[key] = !S[key]; saveSettings(); }
+function toggleSetting(key) { 
+  S[key] = !S[key]; 
+  saveSettings(); 
+  if (key === 'randomImposterCount') {
+    document.getElementById('setting-count-row').style.display = S.randomImposterCount ? 'none' : 'flex';
+    if (typeof updateOddsDisplay === 'function') updateOddsDisplay();
+  }
+}
 
 // ── Game State ────────────────────────────────────────────────
 const GS = {
@@ -520,6 +534,82 @@ function savePlayers() {
   }
 }
 
+function updateOddsDisplay() {
+  const totalW = GS.players.reduce((s, p) => s + (p.weight !== undefined ? p.weight : 50), 0);
+  const maxImp = Math.max(1, GS.players.length - 1);
+  const estImp = S.randomImposterCount ? Math.max(1, Math.floor(GS.players.length / 2)) : Math.min(S.imposterCount, maxImp);
+  
+  GS.players.forEach(p => {
+    const el = document.getElementById(`chance-badge-${p.id}`);
+    if (el) {
+      if (totalW <= 0) {
+        el.textContent = '0%';
+      } else {
+        const chance = Math.min(100, Math.round(((p.weight !== undefined ? p.weight : 50) / totalW) * estImp * 100));
+        el.textContent = `${chance}%`;
+      }
+    }
+  });
+}
+
+function setPlayerWeight(id, val) {
+  const p = GS.players.find(x => x.id === id);
+  if (p) {
+    p.weight = parseInt(val, 10);
+    savePlayers();
+    updateOddsDisplay();
+    if (GS.isOnline && GS.isHost) syncLobbyToJoiners();
+  }
+}
+
+function openOddsModal() {
+  playSound('click');
+  document.getElementById('settings-modal').classList.remove('active');
+  renderOddsList();
+  document.getElementById('odds-modal').classList.add('active');
+}
+
+function renderOddsList() {
+  const ul = document.getElementById('odds-list-container');
+  if (!ul) return;
+  ul.innerHTML = '';
+  if (!GS.players.length) {
+    ul.innerHTML = '<p class="empty-list-msg">No players yet — add some first!</p>';
+    return;
+  }
+  GS.players.forEach(p => {
+    if (typeof p.weight === 'undefined') p.weight = 50;
+    const li = document.createElement('div');
+    li.className = 'player-tag';
+    li.style.flexDirection = 'column';
+    li.style.alignItems = 'flex-start';
+    li.style.gap = '8px';
+    
+    const sliderDisable = (GS.isOnline && !GS.isHost) ? 'disabled' : '';
+
+    li.innerHTML = `
+      <div class="player-info-tag">
+        <div class="player-avatar-dot" style="background:${p.color};">${p.emoji}</div>
+        <span style="font-weight:600; font-size:0.95rem;">${esc(p.name)}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; padding: 0 4px; width:100%;">
+        <input type="range" class="player-weight-slider" min="0" max="100" value="${p.weight}" 
+               oninput="setPlayerWeight(${p.id}, this.value)" ${sliderDisable}>
+        <span id="chance-badge-${p.id}" class="player-chance-badge">0%</span>
+      </div>`;
+    ul.appendChild(li);
+  });
+  updateOddsDisplay();
+}
+
+function resetOdds() {
+  playSound('click');
+  GS.players.forEach(p => p.weight = 50);
+  savePlayers();
+  renderOddsList();
+  if (GS.isOnline && GS.isHost) syncLobbyToJoiners();
+}
+
 function renderPlayerList() {
   const ul = document.getElementById('players-list');
   ul.innerHTML = '';
@@ -529,6 +619,7 @@ function renderPlayerList() {
     return;
   }
   GS.players.forEach(p => {
+    if (typeof p.weight === 'undefined') p.weight = 50;
     const li = document.createElement('div');
     li.className = 'player-tag';
     
@@ -802,8 +893,13 @@ function startGame() {
   if (!GS.selectedCats.length) { notify('Pick at least one category!'); return; }
 
   // clamp imposter count
-  const maxImp = Math.max(1, GS.players.length - 2);
-  const impCount = Math.min(S.imposterCount, maxImp);
+  let impCount = 1;
+  if (S.randomImposterCount) {
+    impCount = Math.floor(Math.random() * (GS.players.length - 1)) + 1;
+  } else {
+    const maxImp = Math.max(1, GS.players.length - 1);
+    impCount = Math.min(S.imposterCount, maxImp);
+  }
 
   let chosenItem = null;
 
@@ -846,11 +942,28 @@ function startGame() {
   GS.players.forEach(p => { p.active=true; p.role='civilian'; p.word=''; });
 
   // assign imposters
-  const idxs = shuffle([...GS.players.keys()]);
-  for (let i=0; i<impCount; i++) {
-    GS.players[idxs[i]].role  = 'imposter';
-    GS.players[idxs[i]].word  = GS.mode === 'classic' ? '' : GS.liarQ;
+  let pool = [...GS.players];
+  for (let i = 0; i < impCount; i++) {
+    const totalWeight = pool.reduce((sum, p) => sum + (p.weight !== undefined ? p.weight : 50), 0);
+    let chosen;
+    if (totalWeight <= 0 || pool.length === 0) {
+      chosen = pool[Math.floor(Math.random() * pool.length)];
+    } else {
+      let rand = Math.random() * totalWeight;
+      for (const p of pool) {
+        rand -= (p.weight !== undefined ? p.weight : 50);
+        if (rand <= 0) {
+          chosen = p;
+          break;
+        }
+      }
+    }
+    if (!chosen) chosen = pool[0];
+    chosen.role = 'imposter';
+    chosen.word = GS.mode === 'classic' ? '' : GS.liarQ;
+    pool = pool.filter(p => p.id !== chosen.id);
   }
+  
   GS.players.filter(p=>p.role==='civilian').forEach(p => {
     p.word = GS.mode === 'classic' ? GS.word : GS.normalQ;
   });
