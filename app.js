@@ -1497,4 +1497,25 @@ function esc(s) {
 function setEl(id, v)      { const e=document.getElementById(id); if(e) e.textContent=v; }
 function setStyle(id,k,v)  { const e=document.getElementById(id); if(e) e.style[k]=v; }
 
+function toggleFullscreen() {
+  playSound('click');
+  if (!document.fullscreenElement) {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen();
+    } else if (document.documentElement.webkitRequestFullscreen) {
+      document.documentElement.webkitRequestFullscreen();
+    } else if (document.documentElement.msRequestFullscreen) {
+      document.documentElement.msRequestFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
+  }
+}
+
 window.onload = initApp;
